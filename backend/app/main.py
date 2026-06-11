@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.routers import documents
 
 from app.config import settings
 
@@ -7,6 +8,8 @@ app = FastAPI(
     description="Backend API for Asset Servicing AI Copilot project",
     version="0.1.0",
 )
+
+app.include_router(documents.router)
 
 
 @app.get("/")
