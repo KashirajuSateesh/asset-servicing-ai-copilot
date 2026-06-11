@@ -224,3 +224,54 @@ def upload_chunks_to_search_index(chunks: list[dict]) -> dict:
         "failed_count": failed,
         "total_documents": len(documents),
     }
+
+
+
+def search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Searches indexed policy/SOP chunks using keyword search.
+
+    This is the first search version.
+    Later we will upgrade it to hybrid search:
+    - keyword search
+    - vector search
+    - metadata filtering
+    """
+
+    search_client = get_search_client()
+
+    # Search Azure AI Search index using the user's query text.
+    results = search_client.search(
+        search_text=query,
+        top=top_k,
+        select=[
+            "chunk_id",
+            "document_name",
+            "document_type",
+            "business_domain",
+            "page_number",
+            "chunk_index",
+            "chunk_text",
+            "source_blob_name",
+        ],
+    )
+
+    # Convert Azure Search result objects into normal Python dictionaries.
+    chunks = []
+
+    for result in results:
+        chunks.append(
+            {
+                "score": result.get("@search.score"),
+                "chunk_id": result.get("chunk_id"),
+                "document_name": result.get("document_name"),
+                "document_type": result.get("document_type"),
+                "business_domain": result.get("business_domain"),
+                "page_number": result.get("page_number"),
+                "chunk_index": result.get("chunk_index"),
+                "chunk_text": result.get("chunk_text"),
+                "source_blob_name": result.get("source_blob_name"),
+            }
+        )
+
+    return chunks

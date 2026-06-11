@@ -6,6 +6,7 @@ from app.services.chunking_service import create_chunks_from_pdf_pages
 from app.services.embedding_service import generate_embedding, generate_embeddings_for_chunks
 from app.services.azure_search_service import (
     create_policy_chunks_index,
+    search_policy_chunks,
     upload_chunks_to_search_index,
 )
 
@@ -205,4 +206,37 @@ def ingest_single_pdf(blob_name: str):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to ingest PDF '{blob_name}': {str(exc)}",
+        )
+    
+
+@router.get("/search")
+def search_documents(query: str, top_k: int = 5):
+    """
+    Searches indexed PDF chunks from Azure AI Search.
+
+    For now, this uses keyword search.
+    Later, we will upgrade it to hybrid search using:
+    - keyword search
+    - vector search
+    - metadata filters
+    """
+
+    try:
+        # Search indexed policy/SOP chunks using the user's query.
+        results = search_policy_chunks(
+            query=query,
+            top_k=top_k,
+        )
+
+        return {
+            "query": query,
+            "top_k": top_k,
+            "result_count": len(results),
+            "results": results,
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to search documents: {str(exc)}",
         )
