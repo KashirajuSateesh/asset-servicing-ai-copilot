@@ -4,6 +4,7 @@ from app.services.azure_blob_service import list_blobs_in_container
 from app.services.pdf_extraction_service import extract_pdf_pages_from_blob
 from app.services.chunking_service import create_chunks_from_pdf_pages
 from app.services.embedding_service import generate_embedding
+from app.services.azure_search_service import create_policy_chunks_index
 
 router = APIRouter(
     prefix="/documents",
@@ -137,4 +138,22 @@ def preview_embedding(blob_name: str):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate embedding preview for '{blob_name}': {str(exc)}",
+        )
+    
+
+@router.post("/search-index/create")
+def create_search_index():
+    """
+    Creates or updates the Azure AI Search index used to store
+    PDF chunks, metadata, citations, and embeddings.
+    """
+
+    try:
+        result = create_policy_chunks_index()
+        return result
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create Azure AI Search index: {str(exc)}",
         )
