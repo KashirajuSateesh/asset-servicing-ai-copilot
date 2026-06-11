@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.routers import documents
 
 from app.config import settings
+from app.services.azure_sql_service import test_sql_connection
 
 app = FastAPI(
     title=settings.app_name,
@@ -56,3 +57,7 @@ def config_check():
             ]
         ),
     }
+
+@app.get("/sql-check")
+def sql_check():
+    return test_sql_connection()
