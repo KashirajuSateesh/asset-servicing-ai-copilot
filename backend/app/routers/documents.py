@@ -3,8 +3,11 @@ from fastapi import APIRouter, HTTPException
 from app.services.azure_blob_service import list_blobs_in_container
 from app.services.pdf_extraction_service import extract_pdf_pages_from_blob
 from app.services.chunking_service import create_chunks_from_pdf_pages
-from app.services.embedding_service import generate_embedding
-from app.services.azure_search_service import create_policy_chunks_index
+from app.services.embedding_service import generate_embedding, generate_embeddings_for_chunks
+from app.services.azure_search_service import (
+    create_policy_chunks_index,
+    upload_chunks_to_search_index,
+)
 
 router = APIRouter(
     prefix="/documents",
@@ -156,4 +159,50 @@ def create_search_index():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create Azure AI Search index: {str(exc)}",
+        )
+    
+
+@router.post("/ingest-pdf/{blob_name}")
+def ingest_single_pdf(blob_name: str):
+    """
+    Ingests one PDF from Azure Blob into Azure AI Search.
+
+    Flow:
+    1. Read PDF from raw-pdfs container
+    2. Extract page-level text
+    3. Create metadata-rich chunks
+    4. Generate OpenAI embeddings
+    5. Upload chunks to Azure AI Search
+    """
+
+    try:
+        # Step 1: Extract PDF text from Azure Blob
+        pages = extract_pdf_pages_from_blob(
+            container_name="raw-pdfs",
+            blob_name=blob_name,
+        )
+
+        # Step 2: Create chunks with citation metadata
+        chunks = create_chunks_from_pdf_pages(
+            document_name=blob_name,
+            pages=pages,
+        )
+
+        # Step 3: Generate embeddings for each chunk
+        embedded_chunks = generate_embeddings_for_chunks(chunks)
+
+        # Step 4: Upload embedded chunks to Azure AI Search
+        upload_result = upload_chunks_to_search_index(embedded_chunks)
+
+        return {
+            "blob_name": blob_name,
+            "pages_extracted": len(pages),
+            "chunks_created": len(chunks),
+            "search_upload_result": upload_result,
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to ingest PDF '{blob_name}': {str(exc)}",
         )

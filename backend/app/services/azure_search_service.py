@@ -12,6 +12,7 @@ from azure.search.documents.indexes.models import (
 )
 
 from app.config import settings
+from azure.search.documents import SearchClient
 
 
 def get_search_index_client() -> SearchIndexClient:
@@ -25,6 +26,25 @@ def get_search_index_client() -> SearchIndexClient:
 
     return SearchIndexClient(
         endpoint=settings.azure_search_endpoint,
+        credential=AzureKeyCredential(settings.azure_search_key),
+    )
+
+def get_search_client() -> SearchClient:
+    """
+    Creates an Azure AI Search document client.
+
+    This client is used for document-level operations like:
+    - uploading chunks
+    - searching chunks
+    - deleting chunks
+    """
+
+    if not settings.azure_search_endpoint or not settings.azure_search_key:
+        raise ValueError("Azure AI Search endpoint or key is missing.")
+
+    return SearchClient(
+        endpoint=settings.azure_search_endpoint,
+        index_name=settings.azure_search_index_name,
         credential=AzureKeyCredential(settings.azure_search_key),
     )
 
@@ -150,4 +170,57 @@ def create_policy_chunks_index() -> dict:
         "index_name": index_name,
         "status": "created_or_updated",
         "embedding_dimensions": 1536,
+    }
+
+def upload_chunks_to_search_index(chunks: list[dict]) -> dict:
+    """
+    Uploads embedded PDF chunks into Azure AI Search.
+
+    Each chunk should already contain:
+    - chunk metadata
+    - chunk text
+    - embedding vector
+    - citation/source information
+    """
+
+    if not chunks:
+        return {
+            "status": "skipped",
+            "message": "No chunks were provided.",
+            "uploaded_count": 0,
+        }
+
+    search_client = get_search_client()
+
+    # Azure AI Search expects a list of dictionaries where keys match index fields.
+    documents = []
+
+    for chunk in chunks:
+        documents.append(
+            {
+                "chunk_id": chunk["chunk_id"],
+                "document_name": chunk["document_name"],
+                "document_type": chunk["document_type"],
+                "business_domain": chunk["business_domain"],
+                "page_number": chunk["page_number"],
+                "chunk_index": chunk["chunk_index"],
+                "chunk_text": chunk["chunk_text"],
+                "source_container": chunk["source_container"],
+                "source_blob_name": chunk["source_blob_name"],
+                "embedding": chunk["embedding"],
+                "embedding_model": chunk["embedding_model"],
+            }
+        )
+
+    # upload_documents performs an upsert-like operation for matching document keys.
+    result = search_client.upload_documents(documents=documents)
+
+    succeeded = sum(1 for item in result if item.succeeded)
+    failed = len(result) - succeeded
+
+    return {
+        "status": "completed",
+        "uploaded_count": succeeded,
+        "failed_count": failed,
+        "total_documents": len(documents),
     }
