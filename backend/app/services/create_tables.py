@@ -4,6 +4,16 @@ from app.services.azure_sql_service import get_engine
 from app.services.sql_schema import TABLE_SCHEMAS
 
 
+TABLE_DROP_ORDER = [
+    "case_tickets",
+    "corporate_actions",
+    "settlement_exceptions",
+    "reconciliation_breaks",
+    "trade_status",
+    "custody_accounts",
+]
+
+
 def table_exists(table_name: str) -> bool:
     engine = get_engine()
 
@@ -44,6 +54,30 @@ def create_tables() -> dict:
     }
 
 
+def reset_tables() -> dict:
+    engine = get_engine()
+    dropped_tables = []
+
+    with engine.begin() as connection:
+        for table_name in TABLE_DROP_ORDER:
+            connection.execute(
+                text(
+                    f"""
+                    IF OBJECT_ID('{table_name}', 'U') IS NOT NULL
+                    DROP TABLE {table_name};
+                    """
+                )
+            )
+            dropped_tables.append(table_name)
+
+    created_result = create_tables()
+
+    return {
+        "dropped_tables": dropped_tables,
+        "created_result": created_result,
+    }
+
+
 if __name__ == "__main__":
-    result = create_tables()
+    result = reset_tables()
     print(result)
