@@ -30,3 +30,6 @@ pnpm-debug.log*
 # Azure / local data
 *.sqlite
 *.db
+
+# Local raw data files
+data/raw/
