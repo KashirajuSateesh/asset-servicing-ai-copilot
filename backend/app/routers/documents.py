@@ -8,6 +8,7 @@ from app.services.azure_search_service import (
     create_policy_chunks_index,
     search_policy_chunks,
     upload_chunks_to_search_index,
+    vector_search_policy_chunks,
 )
 
 router = APIRouter(
@@ -239,4 +240,40 @@ def search_documents(query: str, top_k: int = 5):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to search documents: {str(exc)}",
+        )
+    
+@router.get("/vector-search")
+def vector_search_documents(query: str, top_k: int = 5):
+    """
+    Searches indexed PDF chunks using vector similarity.
+
+    What this endpoint does:
+    1. Takes the user's question.
+    2. Converts the question into an embedding using OpenAI.
+    3. Searches Azure AI Search using vector similarity.
+    4. Returns chunks that are semantically close to the question.
+
+    This is better than keyword search when the user asks a question
+    using different words than the PDF.
+    """
+
+    try:
+        # Run vector search against Azure AI Search.
+        results = vector_search_policy_chunks(
+            query=query,
+            top_k=top_k,
+        )
+
+        return {
+            "query": query,
+            "search_type": "vector",
+            "top_k": top_k,
+            "result_count": len(results),
+            "results": results,
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to run vector search: {str(exc)}",
         )

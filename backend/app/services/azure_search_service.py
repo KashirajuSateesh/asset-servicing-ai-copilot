@@ -1,4 +1,5 @@
 from azure.core.credentials import AzureKeyCredential
+from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes.models import (
     HnswAlgorithmConfiguration,
@@ -10,15 +11,22 @@ from azure.search.documents.indexes.models import (
     VectorSearch,
     VectorSearchProfile,
 )
+from azure.search.documents.models import VectorizedQuery
 
 from app.config import settings
-from azure.search.documents import SearchClient
+from app.services.embedding_service import generate_embedding
 
 
 def get_search_index_client() -> SearchIndexClient:
     """
     Creates an Azure AI Search index client.
-    This client is used for index-level operations like creating or deleting indexes.
+
+    This client is used for index-level operations like:
+    - creating indexes
+    - updating indexes
+    - deleting indexes
+
+    We use this when setting up the vector database structure.
     """
 
     if not settings.azure_search_endpoint or not settings.azure_search_key:
@@ -29,6 +37,7 @@ def get_search_index_client() -> SearchIndexClient:
         credential=AzureKeyCredential(settings.azure_search_key),
     )
 
+
 def get_search_client() -> SearchClient:
     """
     Creates an Azure AI Search document client.
@@ -36,7 +45,9 @@ def get_search_client() -> SearchClient:
     This client is used for document-level operations like:
     - uploading chunks
     - searching chunks
-    - deleting chunks
+    - retrieving indexed data
+
+    We use this after the index already exists.
     """
 
     if not settings.azure_search_endpoint or not settings.azure_search_key:
@@ -51,20 +62,25 @@ def get_search_client() -> SearchClient:
 
 def create_policy_chunks_index() -> dict:
     """
-    Creates the Azure AI Search index used for PDF policy/SOP chunks.
+    Creates or updates the Azure AI Search index used for PDF policy/SOP chunks.
 
-    The index stores:
+    This index works like our vector database.
+
+    It stores:
     - chunk text
     - document metadata
+    - page number for citation
+    - source blob name
     - OpenAI embedding vector
-    - source/citation information
+
+    The embedding field allows vector search.
     """
 
     index_client = get_search_index_client()
     index_name = settings.azure_search_index_name
 
     fields = [
-        # Unique key for every chunk
+        # Unique ID for every chunk. This is the primary key in Azure AI Search.
         SimpleField(
             name="chunk_id",
             type=SearchFieldDataType.String,
@@ -72,19 +88,23 @@ def create_policy_chunks_index() -> dict:
             filterable=True,
         ),
 
-        # Searchable document metadata
+        # Original PDF/document name.
         SearchableField(
             name="document_name",
             type=SearchFieldDataType.String,
             filterable=True,
             sortable=True,
         ),
+
+        # Type of document: sop, policy, procedure, guide, standard.
         SimpleField(
             name="document_type",
             type=SearchFieldDataType.String,
             filterable=True,
             facetable=True,
         ),
+
+        # Business domain: settlement, reconciliation, custody, corporate_actions, etc.
         SimpleField(
             name="business_domain",
             type=SearchFieldDataType.String,
@@ -92,13 +112,15 @@ def create_policy_chunks_index() -> dict:
             facetable=True,
         ),
 
-        # Citation metadata
+        # Page number helps us create citations in final answers.
         SimpleField(
             name="page_number",
             type=SearchFieldDataType.Int32,
             filterable=True,
             sortable=True,
         ),
+
+        # Chunk number within the page.
         SimpleField(
             name="chunk_index",
             type=SearchFieldDataType.Int32,
@@ -106,27 +128,29 @@ def create_policy_chunks_index() -> dict:
             sortable=True,
         ),
 
-        # Main searchable text
+        # Actual text content from the PDF chunk.
         SearchableField(
             name="chunk_text",
             type=SearchFieldDataType.String,
             analyzer_name="en.microsoft",
         ),
 
-        # Source tracking
+        # Blob container where the original PDF came from.
         SimpleField(
             name="source_container",
             type=SearchFieldDataType.String,
             filterable=True,
         ),
+
+        # Blob filename/source file path.
         SimpleField(
             name="source_blob_name",
             type=SearchFieldDataType.String,
             filterable=True,
         ),
 
-        # OpenAI embedding vector.
-        # text-embedding-3-small returns 1536 dimensions.
+        # OpenAI embedding vector for semantic/vector search.
+        # text-embedding-3-small returns 1536-dimensional vectors.
         SearchField(
             name="embedding",
             type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
@@ -135,7 +159,7 @@ def create_policy_chunks_index() -> dict:
             vector_search_profile_name="policy-vector-profile",
         ),
 
-        # Embedding model used for traceability
+        # Store embedding model name for traceability.
         SimpleField(
             name="embedding_model",
             type=SearchFieldDataType.String,
@@ -143,6 +167,7 @@ def create_policy_chunks_index() -> dict:
         ),
     ]
 
+    # HNSW is the approximate nearest neighbor algorithm used for vector search.
     vector_search = VectorSearch(
         algorithms=[
             HnswAlgorithmConfiguration(
@@ -163,7 +188,7 @@ def create_policy_chunks_index() -> dict:
         vector_search=vector_search,
     )
 
-    # Create or update allows us to rerun this safely during development.
+    # create_or_update_index lets us safely rerun this during development.
     index_client.create_or_update_index(index)
 
     return {
@@ -172,15 +197,22 @@ def create_policy_chunks_index() -> dict:
         "embedding_dimensions": 1536,
     }
 
+
 def upload_chunks_to_search_index(chunks: list[dict]) -> dict:
     """
     Uploads embedded PDF chunks into Azure AI Search.
 
-    Each chunk should already contain:
-    - chunk metadata
+    Input:
+    - chunks with metadata
     - chunk text
-    - embedding vector
-    - citation/source information
+    - OpenAI embeddings
+
+    Output:
+    - upload status
+    - uploaded count
+    - failed count
+
+    This is the final step of the ingestion pipeline.
     """
 
     if not chunks:
@@ -192,9 +224,9 @@ def upload_chunks_to_search_index(chunks: list[dict]) -> dict:
 
     search_client = get_search_client()
 
-    # Azure AI Search expects a list of dictionaries where keys match index fields.
     documents = []
 
+    # Azure AI Search expects each document to match the index field names.
     for chunk in chunks:
         documents.append(
             {
@@ -212,7 +244,8 @@ def upload_chunks_to_search_index(chunks: list[dict]) -> dict:
             }
         )
 
-    # upload_documents performs an upsert-like operation for matching document keys.
+    # Upload documents into Azure AI Search.
+    # If a chunk_id already exists, Azure updates/replaces that document.
     result = search_client.upload_documents(documents=documents)
 
     succeeded = sum(1 for item in result if item.succeeded)
@@ -226,21 +259,22 @@ def upload_chunks_to_search_index(chunks: list[dict]) -> dict:
     }
 
 
-
 def search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
     """
     Searches indexed policy/SOP chunks using keyword search.
 
-    This is the first search version.
-    Later we will upgrade it to hybrid search:
-    - keyword search
-    - vector search
-    - metadata filtering
+    What this does:
+    1. Takes the user's query as text.
+    2. Searches chunk_text and searchable fields in Azure AI Search.
+    3. Returns the top matching chunks.
+
+    This is useful when the user query contains exact words from the document.
+    Example:
+    - "settlement exception SLA"
     """
 
     search_client = get_search_client()
 
-    # Search Azure AI Search index using the user's query text.
     results = search_client.search(
         search_text=query,
         top=top_k,
@@ -256,9 +290,84 @@ def search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
         ],
     )
 
-    # Convert Azure Search result objects into normal Python dictionaries.
     chunks = []
 
+    # Convert Azure Search result objects into normal dictionaries.
+    for result in results:
+        chunks.append(
+            {
+                "score": result.get("@search.score"),
+                "chunk_id": result.get("chunk_id"),
+                "document_name": result.get("document_name"),
+                "document_type": result.get("document_type"),
+                "business_domain": result.get("business_domain"),
+                "page_number": result.get("page_number"),
+                "chunk_index": result.get("chunk_index"),
+                "chunk_text": result.get("chunk_text"),
+                "source_blob_name": result.get("source_blob_name"),
+            }
+        )
+
+    return chunks
+
+
+def vector_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Searches indexed policy/SOP chunks using vector similarity.
+
+    What this does:
+    1. Converts the user's question into an OpenAI embedding.
+    2. Sends that query embedding to Azure AI Search.
+    3. Azure AI Search compares the query embedding against stored chunk embeddings.
+    4. Returns the most semantically similar chunks.
+
+    Why this matters:
+    Keyword search only matches exact words.
+    Vector search matches meaning.
+
+    Example:
+    User asks:
+    "When do I need not to escalate a failed settlement?"
+
+    The PDF might say:
+    "Critical issues and aged breaks require escalation based on severity and SLA."
+
+    Vector search can still find the right chunk because the meaning is similar.
+    """
+
+    search_client = get_search_client()
+
+    # Step 1: Convert the user's query into an embedding vector.
+    query_embedding = generate_embedding(query)
+
+    # Step 2: Build vector search query.
+    # The field name must match the vector field in our Azure AI Search index.
+    vector_query = VectorizedQuery(
+        vector=query_embedding,
+        k_nearest_neighbors=top_k,
+        fields="embedding",
+    )
+
+    # Step 3: Run vector search against Azure AI Search.
+    results = search_client.search(
+        search_text=None,
+        vector_queries=[vector_query],
+        top=top_k,
+        select=[
+            "chunk_id",
+            "document_name",
+            "document_type",
+            "business_domain",
+            "page_number",
+            "chunk_index",
+            "chunk_text",
+            "source_blob_name",
+        ],
+    )
+
+    chunks = []
+
+    # Step 4: Convert Azure Search result objects into normal dictionaries.
     for result in results:
         chunks.append(
             {
