@@ -7,6 +7,7 @@ from app.services.operations_data_service import (
     get_reconciliation_break_by_id,
     get_trade_by_id,
 )
+from app.services.operations_lookup_service import lookup_operational_record
 
 router = APIRouter(
     prefix="/operations",
@@ -69,3 +70,25 @@ def case_detail(case_id: str):
         )
 
     return case
+
+@router.get("/lookup/{record_id}")
+def lookup_record(record_id: str):
+    """
+    Looks up any supported operational record by ID.
+
+    What this endpoint does:
+    1. Accepts a record ID from the user or agent.
+    2. Detects the record type from the ID prefix.
+    3. Calls the correct Azure SQL lookup function.
+    4. Returns the matching operational record.
+
+    Supported ID formats:
+    - TRD-0000001  -> trade
+    - EXC-000001   -> settlement exception
+    - BRK-0000001  -> reconciliation break
+    - CASE-0000001 -> case ticket
+
+    This endpoint will later become a good MCP tool candidate.
+    """
+
+    return lookup_operational_record(record_id)
