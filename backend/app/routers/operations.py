@@ -8,6 +8,7 @@ from app.services.operations_data_service import (
     get_trade_by_id,
 )
 from app.services.operations_lookup_service import lookup_operational_record
+from app.services.operational_context_service import build_operational_context
 
 router = APIRouter(
     prefix="/operations",
@@ -92,3 +93,19 @@ def lookup_record(record_id: str):
     """
 
     return lookup_operational_record(record_id)
+
+@router.get("/context/{record_id}")
+def get_operational_context(record_id: str):
+    """
+    Builds business context for an operational record.
+
+    What this endpoint does:
+    1. Accepts a trade, exception, break, or case ID.
+    2. Looks up the record from Azure SQL.
+    3. Converts the raw SQL record into a clean context summary.
+    4. Returns both the summary and the raw record data.
+
+    This endpoint will later be used by the operational agent.
+    """
+
+    return build_operational_context(record_id)
