@@ -385,7 +385,11 @@ def vector_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
 
     return chunks
 
-def hybrid_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
+def hybrid_search_policy_chunks(
+    query: str,
+    top_k: int = 5,
+    business_domain: str | None = None,
+) -> list[dict]:
     """
     Searches indexed policy/SOP chunks using hybrid search.
 
@@ -393,10 +397,12 @@ def hybrid_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
     - keyword search using the original user query
     - vector search using the OpenAI embedding of the user query
 
-    Why this is useful:
-    - keyword search catches exact policy terms
-    - vector search catches semantic meaning
-    - combining both gives better retrieval for RAG
+    Optional business_domain filtering helps reduce irrelevant results.
+
+    Example:
+    - settlement questions can filter business_domain eq 'settlement'
+    - reconciliation questions can filter business_domain eq 'reconciliation'
+    - custody questions can filter business_domain eq 'custody'
     """
 
     search_client = get_search_client()
@@ -411,12 +417,21 @@ def hybrid_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
         fields="embedding",
     )
 
-    # Step 3: Run hybrid search.
+    # Step 3: Build optional metadata filter.
+    # Azure AI Search uses OData filter syntax.
+    search_filter = None
+
+    if business_domain:
+        search_filter = f"business_domain eq '{business_domain}'"
+
+    # Step 4: Run hybrid search.
     # search_text=query gives keyword search.
     # vector_queries=[vector_query] gives semantic vector search.
+    # filter=search_filter limits search to a specific document domain.
     results = search_client.search(
         search_text=query,
         vector_queries=[vector_query],
+        filter=search_filter,
         top=top_k,
         select=[
             "chunk_id",
@@ -432,7 +447,7 @@ def hybrid_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
 
     chunks = []
 
-    # Step 4: Convert Azure Search results into normal Python dictionaries.
+    # Step 5: Convert Azure Search results into normal Python dictionaries.
     for result in results:
         chunks.append(
             {

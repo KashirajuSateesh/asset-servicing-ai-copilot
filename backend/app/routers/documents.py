@@ -11,6 +11,7 @@ from app.services.azure_search_service import (
     vector_search_policy_chunks,
     hybrid_search_policy_chunks,
 )
+from app.services.rag_answer_service import generate_rag_answer
 
 router = APIRouter(
     prefix="/documents",
@@ -382,4 +383,54 @@ def ingest_all_pdfs():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to ingest all PDFs: {str(exc)}",
+        )
+    
+@router.get("/ask")
+def ask_documents(
+    query: str,
+    top_k: int = 5,
+    business_domain: str | None = None,
+):
+    """
+    Generates a RAG answer from indexed policy/SOP documents.
+
+    What this endpoint does:
+    1. Takes the user's question.
+    2. Optionally applies a business domain filter.
+    3. Runs hybrid search to retrieve relevant PDF chunks.
+    4. Sends the retrieved chunks to OpenAI.
+    5. Generates a business-friendly answer.
+    6. Returns the answer with citation metadata.
+
+    Example business_domain values:
+    - settlement
+    - reconciliation
+    - custody
+    - corporate_actions
+    - sla_escalation
+    """
+
+    try:
+        # Keep top_k controlled so we do not send too much context to the LLM.
+        if top_k < 1 or top_k > 10:
+            raise HTTPException(
+                status_code=400,
+                detail="top_k must be between 1 and 10.",
+            )
+
+        # Run the full RAG pipeline with optional metadata filtering.
+        rag_response = generate_rag_answer(
+            query=query,
+            top_k=top_k,
+            business_domain=business_domain,
+        )
+
+        return rag_response
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate RAG answer: {str(exc)}",
         )
