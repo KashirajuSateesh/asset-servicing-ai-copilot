@@ -9,6 +9,7 @@ from app.services.operations_data_service import (
 )
 from app.services.operations_lookup_service import lookup_operational_record
 from app.services.operational_context_service import build_operational_context
+from app.services.operational_guidance_service import generate_operational_guidance
 
 router = APIRouter(
     prefix="/operations",
@@ -109,3 +110,25 @@ def get_operational_context(record_id: str):
     """
 
     return build_operational_context(record_id)
+
+
+@router.get("/guidance/{record_id}")
+def get_operational_guidance(record_id: str, top_k: int = 8):
+    """
+    Generates operational guidance for a record.
+
+    What this endpoint does:
+    1. Looks up the operational record from Azure SQL.
+    2. Builds a clean context summary.
+    3. Converts that context into a policy question.
+    4. Runs RAG against policy/SOP documents.
+    5. Returns combined SQL context + policy guidance.
+
+    This is the first endpoint that combines live data with RAG.
+    Later, this will become part of the Operational Agent.
+    """
+
+    return generate_operational_guidance(
+        record_id=record_id,
+        top_k=top_k,
+    )
