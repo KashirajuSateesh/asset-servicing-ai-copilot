@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.config import settings
-from app.routers import documents, operations
+from app.routers import documents, operations, copilot
 from app.services.azure_sql_service import test_sql_connection
 
 
@@ -13,6 +13,7 @@ app = FastAPI(
 
 app.include_router(documents.router)
 app.include_router(operations.router)
+app.include_router(copilot.router)
 
 
 @app.get("/")
