@@ -384,3 +384,68 @@ def vector_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
         )
 
     return chunks
+
+def hybrid_search_policy_chunks(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Searches indexed policy/SOP chunks using hybrid search.
+
+    Hybrid search means:
+    - keyword search using the original user query
+    - vector search using the OpenAI embedding of the user query
+
+    Why this is useful:
+    - keyword search catches exact policy terms
+    - vector search catches semantic meaning
+    - combining both gives better retrieval for RAG
+    """
+
+    search_client = get_search_client()
+
+    # Step 1: Convert the user's query into an embedding vector.
+    query_embedding = generate_embedding(query)
+
+    # Step 2: Create vector query for semantic matching.
+    vector_query = VectorizedQuery(
+        vector=query_embedding,
+        k_nearest_neighbors=top_k,
+        fields="embedding",
+    )
+
+    # Step 3: Run hybrid search.
+    # search_text=query gives keyword search.
+    # vector_queries=[vector_query] gives semantic vector search.
+    results = search_client.search(
+        search_text=query,
+        vector_queries=[vector_query],
+        top=top_k,
+        select=[
+            "chunk_id",
+            "document_name",
+            "document_type",
+            "business_domain",
+            "page_number",
+            "chunk_index",
+            "chunk_text",
+            "source_blob_name",
+        ],
+    )
+
+    chunks = []
+
+    # Step 4: Convert Azure Search results into normal Python dictionaries.
+    for result in results:
+        chunks.append(
+            {
+                "score": result.get("@search.score"),
+                "chunk_id": result.get("chunk_id"),
+                "document_name": result.get("document_name"),
+                "document_type": result.get("document_type"),
+                "business_domain": result.get("business_domain"),
+                "page_number": result.get("page_number"),
+                "chunk_index": result.get("chunk_index"),
+                "chunk_text": result.get("chunk_text"),
+                "source_blob_name": result.get("source_blob_name"),
+            }
+        )
+
+    return chunks

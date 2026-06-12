@@ -9,6 +9,7 @@ from app.services.azure_search_service import (
     search_policy_chunks,
     upload_chunks_to_search_index,
     vector_search_policy_chunks,
+    hybrid_search_policy_chunks,
 )
 
 router = APIRouter(
@@ -276,4 +277,40 @@ def vector_search_documents(query: str, top_k: int = 5):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to run vector search: {str(exc)}",
+        )
+    
+@router.get("/hybrid-search")
+def hybrid_search_documents(query: str, top_k: int = 5):
+    """
+    Searches indexed PDF chunks using hybrid search.
+
+    What this endpoint does:
+    1. Takes the user's question.
+    2. Runs keyword search using the query text.
+    3. Runs vector search using the query embedding.
+    4. Combines both signals inside Azure AI Search.
+    5. Returns the best chunks for RAG answer generation.
+
+    This will become the main retrieval endpoint for the copilot.
+    """
+
+    try:
+        # Run hybrid search against Azure AI Search.
+        results = hybrid_search_policy_chunks(
+            query=query,
+            top_k=top_k,
+        )
+
+        return {
+            "query": query,
+            "search_type": "hybrid",
+            "top_k": top_k,
+            "result_count": len(results),
+            "results": results,
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to run hybrid search: {str(exc)}",
         )
