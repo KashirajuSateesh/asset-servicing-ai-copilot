@@ -314,3 +314,72 @@ def hybrid_search_documents(query: str, top_k: int = 5):
             status_code=500,
             detail=f"Failed to run hybrid search: {str(exc)}",
         )
+    
+
+@router.post("/ingest-all-pdfs")
+def ingest_all_pdfs():
+    """
+    Ingests all PDFs from the raw-pdfs Azure Blob container into Azure AI Search.
+
+    What this endpoint does:
+    1. Lists all PDF files from the raw-pdfs container.
+    2. For each PDF:
+       - extracts text
+       - creates chunks
+       - generates embeddings
+       - uploads chunks to Azure AI Search
+    3. Returns a summary of how many PDFs were processed.
+
+    Why this is useful:
+    This turns our one-file test pipeline into a full document ingestion pipeline.
+    """
+
+    try:
+        # Step 1: Get all blobs from the raw-pdfs container.
+        blobs = list_blobs_in_container("raw-pdfs")
+
+        ingestion_results = []
+
+        # Step 2: Process each PDF one by one.
+        for blob in blobs:
+            blob_name = blob["name"]
+
+            # Extract page text from Azure Blob PDF.
+            pages = extract_pdf_pages_from_blob(
+                container_name="raw-pdfs",
+                blob_name=blob_name,
+            )
+
+            # Create metadata-rich chunks from extracted pages.
+            chunks = create_chunks_from_pdf_pages(
+                document_name=blob_name,
+                pages=pages,
+            )
+
+            # Generate embeddings for every chunk.
+            embedded_chunks = generate_embeddings_for_chunks(chunks)
+
+            # Upload chunks to Azure AI Search.
+            upload_result = upload_chunks_to_search_index(embedded_chunks)
+
+            ingestion_results.append(
+                {
+                    "blob_name": blob_name,
+                    "pages_extracted": len(pages),
+                    "chunks_created": len(chunks),
+                    "uploaded_count": upload_result["uploaded_count"],
+                    "failed_count": upload_result["failed_count"],
+                }
+            )
+
+        return {
+            "total_pdfs_found": len(blobs),
+            "total_pdfs_processed": len(ingestion_results),
+            "results": ingestion_results,
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to ingest all PDFs: {str(exc)}",
+        )
