@@ -2,6 +2,7 @@ from openai import OpenAI
 
 from app.config import settings
 from app.services.azure_search_service import hybrid_search_policy_chunks
+from app.services.domain_classifier_service import detect_business_domain
 
 
 CHAT_MODEL = "gpt-4o-mini"
@@ -209,19 +210,28 @@ def generate_rag_answer(
     - sla_escalation
     """
 
-    # Step 1: Retrieve relevant policy/SOP chunks using hybrid search.
-    # If business_domain is provided, Azure AI Search will only search that domain.
+    # Step 1: Detect business domain if the user/API did not provide one.
+    # Example:
+    # "failed settlement escalation" -> settlement
+    # "cash reconciliation break" -> reconciliation
+    detected_business_domain = business_domain
+
+    if not detected_business_domain:
+        detected_business_domain = detect_business_domain(query)
+
+    # Step 2: Retrieve relevant policy/SOP chunks using hybrid search.
+    # If a domain is detected, Azure AI Search will only search that domain.
     retrieved_chunks = hybrid_search_policy_chunks(
         query=query,
         top_k=top_k,
-        business_domain=business_domain,
+        business_domain=detected_business_domain,
     )
 
     # Step 2: If no chunks are found, return a safe response.
     if not retrieved_chunks:
         return {
             "query": query,
-            "business_domain": business_domain,
+            "business_domain": detected_business_domain,
             "answer": "I could not find relevant policy or SOP content for this question.",
             "retrieved_chunk_count": 0,
             "confidence_score": 0.0,
@@ -247,7 +257,7 @@ def generate_rag_answer(
 
     return {
         "query": query,
-        "business_domain": business_domain,
+        "business_domain": detected_business_domain,
         "answer": answer,
         "retrieved_chunk_count": len(retrieved_chunks),
         "confidence_score": confidence["confidence_score"],
