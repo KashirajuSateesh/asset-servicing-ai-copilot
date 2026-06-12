@@ -132,6 +132,57 @@ Generate the final answer using only the source context.
     return response.choices[0].message.content
 
 
+def calculate_confidence_score(chunks: list[dict]) -> dict:
+    """
+    Calculates a simple confidence score based on retrieved search results.
+
+    Why we need this:
+    In a RAG system, not every answer should be treated equally.
+    If retrieval quality is weak, the copilot should show lower confidence
+    and later route the case to human review.
+
+    Current simple logic:
+    - Use the top retrieved score from Azure AI Search.
+    - Normalize it into a 0 to 1 confidence value.
+    - Assign a confidence label.
+
+    Note:
+    Azure AI Search scores differ between keyword, vector, and hybrid search.
+    This is a demo-level confidence score. Later, we can improve it with
+    reranking, citation coverage, and LLM self-evaluation.
+    """
+
+    if not chunks:
+        return {
+            "confidence_score": 0.0,
+            "confidence_label": "low",
+            "human_review_required": True,
+        }
+
+    # Get the highest search score from retrieved chunks.
+    top_score = chunks[0].get("score") or 0.0
+
+    # Hybrid search scores are usually small decimals.
+    # This simple normalization keeps the score between 0 and 1.
+    normalized_score = min(float(top_score) / 0.03, 1.0)
+
+    if normalized_score >= 0.75:
+        confidence_label = "high"
+        human_review_required = False
+    elif normalized_score >= 0.50:
+        confidence_label = "medium"
+        human_review_required = False
+    else:
+        confidence_label = "low"
+        human_review_required = True
+
+    return {
+        "confidence_score": round(normalized_score, 2),
+        "confidence_label": confidence_label,
+        "human_review_required": human_review_required,
+    }
+
+
 def generate_rag_answer(
     query: str,
     top_k: int = 5,
@@ -173,6 +224,9 @@ def generate_rag_answer(
             "business_domain": business_domain,
             "answer": "I could not find relevant policy or SOP content for this question.",
             "retrieved_chunk_count": 0,
+            "confidence_score": 0.0,
+            "confidence_label": "low",
+            "human_review_required": True,
             "citations": [],
         }
 
@@ -188,10 +242,16 @@ def generate_rag_answer(
     # Step 5: Build citation metadata for traceability.
     citations = build_citations(retrieved_chunks)
 
+    # Step 6: Calculate confidence score from retrieval quality.
+    confidence = calculate_confidence_score(retrieved_chunks)
+
     return {
         "query": query,
         "business_domain": business_domain,
         "answer": answer,
         "retrieved_chunk_count": len(retrieved_chunks),
+        "confidence_score": confidence["confidence_score"],
+        "confidence_label": confidence["confidence_label"],
+        "human_review_required": confidence["human_review_required"],
         "citations": citations,
     }
