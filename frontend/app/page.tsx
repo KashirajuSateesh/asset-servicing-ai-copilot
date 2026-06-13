@@ -41,6 +41,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CopilotResponse | null>(null);
   const [error, setError] = useState("");
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -85,6 +86,14 @@ export default function Home() {
 
       const data = await response.json();
       setResult(data);
+      const auditResponse = await fetch(
+        `${apiBaseUrl}/audit/events/${conversationId}?limit=5`
+      );
+
+      if (auditResponse.ok) {
+        const auditData = await auditResponse.json();
+        setAuditEvents(auditData.events || []);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -245,11 +254,60 @@ export default function Home() {
 
             <section className="rounded-3xl bg-white p-6 shadow">
               <h2 className="text-lg font-semibold">Security & Observability</h2>
+
               <div className="mt-4 grid gap-3 text-sm">
-                <StatusItem label="RBAC / Auth planned" status="Planned" />
-                <StatusItem label="Audit logs planned" status="Planned" />
-                <StatusItem label="Request tracing planned" status="Planned" />
-                <StatusItem label="Error monitoring planned" status="Planned" />
+                <StatusItem label="Audit logs" status="Active" />
+                <StatusItem label="Cosmos memory tracking" status="Active" />
+                <StatusItem label="Confidence monitoring" status="Active" />
+                <StatusItem label="Human review flag" status="Active" />
+                <StatusItem label="RBAC / Auth" status="Planned" />
+              </div>
+
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  Latest Audit Events
+                </h3>
+
+                <div className="mt-3 space-y-3">
+                  {auditEvents.length === 0 && (
+                    <p className="text-sm text-slate-500">
+                      Audit events will appear after a copilot request.
+                    </p>
+                  )}
+
+                  {auditEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">
+                          {event.event_type || "audit_event"}
+                        </p>
+                        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
+                          {event.status}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 space-y-1 text-xs text-slate-600">
+                        <p>Route: {event.route || "-"}</p>
+                        <p>Record ID: {event.record_id || "-"}</p>
+                        <p>Domain: {event.business_domain || "-"}</p>
+                        <p>
+                          Confidence:{" "}
+                          {event.confidence_score !== null
+                            ? `${event.confidence_score} (${event.confidence_label})`
+                            : "-"}
+                        </p>
+                        <p>Memory used: {String(event.memory_used)}</p>
+                        <p>Memory saved: {String(event.memory_saved)}</p>
+                        <p className="text-slate-400">
+                          {event.created_at}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
           </aside>
