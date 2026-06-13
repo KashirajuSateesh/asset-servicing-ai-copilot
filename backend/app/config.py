@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     azure_search_key: str | None = None
     azure_search_index_name: str = "asset-policy-chunks"
 
+    # Azure Cosmos DB 
+    azure_cosmos_endpoint: str | None = None
+    azure_cosmos_key: str | None = None
+    azure_cosmos_database: str = "asset_copilot_memory"
+    azure_cosmos_container: str = "agent_state"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
