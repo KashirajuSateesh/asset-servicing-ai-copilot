@@ -68,6 +68,36 @@ type CopilotResponse = {
   };
 };
 
+type SystemHealthResponse = {
+  overall_status: string;
+  components: {
+    backend?: {
+      status: string;
+      message: string;
+    };
+    azure_sql?: {
+      status: string;
+      message: string;
+    };
+    azure_ai_search?: {
+      status: string;
+      message: string;
+    };
+    cosmos_memory_audit?: {
+      status: string;
+      message: string;
+    };
+    api_key_security?: {
+      status: string;
+      message: string;
+    };
+    audit_logging?: {
+      status: string;
+      message: string;
+    };
+  };
+};
+
 const navigationItems: NavigationItem[] = [
   {
     key: "dashboard",
@@ -115,11 +145,11 @@ export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <div className="flex min-h-screen">
+    <main className="h-screen overflow-hidden bg-slate-100 text-slate-950">
+      <div className="flex h-screen overflow-hidden">
         <Sidebar activePage={activePage} setActivePage={setActivePage} />
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar />
 
           <section className="flex-1 overflow-y-auto p-8">
@@ -146,8 +176,8 @@ function Sidebar({
   setActivePage: (page: PageKey) => void;
 }) {
   return (
-    <aside className="flex w-72 flex-col bg-[#061a3a] text-white">
-      <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
+    <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col overflow-hidden bg-[#061a3a] text-white">
+      <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300">
           <Bot className="h-6 w-6" />
         </div>
@@ -158,7 +188,7 @@ function Sidebar({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-2 px-4 py-6">
+      <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-6">
         {navigationItems.map((item) => {
           const isActive = activePage === item.key;
 
@@ -179,7 +209,7 @@ function Sidebar({
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-5 text-xs text-slate-300">
+      <div className="shrink-0 border-t border-white/10 p-5 text-xs text-slate-300">
         <div className="flex items-center gap-2">
           <RefreshCcw className="h-4 w-4" />
           <span>Data refreshed from live services</span>
@@ -195,7 +225,7 @@ function Sidebar({
 
 function Topbar() {
   return (
-    <header className="flex h-20 items-center justify-between border-b border-slate-200 bg-white px-8 shadow-sm">
+    <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 shadow-sm">
       <div className="flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
         <Search className="h-5 w-5 text-slate-400" />
         <input
@@ -702,11 +732,284 @@ function AnalyticsPage() {
 }
 
 function AdminPage() {
+  const [systemHealth, setSystemHealth] =
+    useState<SystemHealthResponse | null>(null);
+  const [conversationId, setConversationId] = useState("conv_demo_ui_001");
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [loadingHealth, setLoadingHealth] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function fetchSystemHealth() {
+    setLoadingHealth(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/system/health`);
+
+      if (!response.ok) {
+        throw new Error(`System health error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSystemHealth(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch system health."
+      );
+    } finally {
+      setLoadingHealth(false);
+    }
+  }
+
+  async function fetchAuditEvents() {
+    setLoadingAudit(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/audit/events/${conversationId}?limit=50`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Audit fetch error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAuditEvents(data.events || []);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch audit events."
+      );
+    } finally {
+      setLoadingAudit(false);
+    }
+  }
+
   return (
-    <PlaceholderPage
-      title="Admin & Observability"
-      description="System health, audit logs, security status, request tracing, and configuration checks."
-    />
+    <div className="space-y-8">
+      <PageHeader
+        title="Admin & Observability"
+        description="Monitor service health, security status, audit logs, request tracing, and operational readiness."
+      />
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold">System Health</h2>
+              <p className="text-sm text-slate-500">
+                Live status from /system/health
+              </p>
+            </div>
+
+            <button
+              onClick={fetchSystemHealth}
+              disabled={loadingHealth}
+              className="rounded-2xl bg-[#061a3a] px-4 py-2 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+            >
+              {loadingHealth ? "Checking..." : "Refresh"}
+            </button>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-xs font-bold uppercase text-slate-500">
+              Overall Status
+            </p>
+            <p className="mt-2 text-3xl font-bold capitalize text-slate-950">
+              {systemHealth?.overall_status || "Not checked"}
+            </p>
+          </div>
+
+          <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-2">
+            <HealthRow
+              label="Backend API"
+              status={systemHealth?.components?.backend?.status || "-"}
+              message={systemHealth?.components?.backend?.message || "-"}
+            />
+            <HealthRow
+              label="Azure SQL"
+              status={systemHealth?.components?.azure_sql?.status || "-"}
+              message={systemHealth?.components?.azure_sql?.message || "-"}
+            />
+            <HealthRow
+              label="Azure AI Search"
+              status={systemHealth?.components?.azure_ai_search?.status || "-"}
+              message={
+                systemHealth?.components?.azure_ai_search?.message || "-"
+              }
+            />
+            <HealthRow
+              label="Cosmos Memory / Audit"
+              status={
+                systemHealth?.components?.cosmos_memory_audit?.status || "-"
+              }
+              message={
+                systemHealth?.components?.cosmos_memory_audit?.message || "-"
+              }
+            />
+            <HealthRow
+              label="API Key Security"
+              status={
+                systemHealth?.components?.api_key_security?.status || "-"
+              }
+              message={
+                systemHealth?.components?.api_key_security?.message || "-"
+              }
+            />
+            <HealthRow
+              label="Audit Logging"
+              status={systemHealth?.components?.audit_logging?.status || "-"}
+              message={systemHealth?.components?.audit_logging?.message || "-"}
+            />
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold">Security & Governance</h2>
+          <p className="text-sm text-slate-500">
+            Demo controls implemented for enterprise readiness.
+          </p>
+
+          <div className="mt-6 max-h-[520px] space-y-4 overflow-y-auto pr-2">
+            <GovernanceCard
+              title="API Key Protection"
+              status="Active"
+              description="Protected copilot endpoint requires x-copilot-api-key header."
+            />
+            <GovernanceCard
+              title="Request Tracing"
+              status="Active"
+              description="Each request receives x-request-id and stores it in audit logs."
+            />
+            <GovernanceCard
+              title="Audit Logging"
+              status="Active"
+              description="Successful and failed copilot requests are stored in Cosmos DB."
+            />
+            <GovernanceCard
+              title="Human Review Flag"
+              status="Active"
+              description="Low-confidence or failed workflows can be marked for review."
+            />
+            <GovernanceCard
+              title="Cosmos Memory"
+              status="Active"
+              description="Conversation state is stored for follow-up questions."
+            />
+            <GovernanceCard
+              title="Azure Entra ID / RBAC"
+              status="Future"
+              description="Production upgrade path for role-based enterprise authentication."
+            />
+          </div>
+        </section>
+      </div>
+
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Audit Event Explorer</h2>
+            <p className="text-sm text-slate-500">
+              Search Cosmos audit records by conversation ID.
+            </p>
+          </div>
+
+          <div className="flex flex-1 gap-3 md:max-w-xl">
+            <input
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+              value={conversationId}
+              onChange={(event) => setConversationId(event.target.value)}
+              placeholder="Enter conversation ID"
+            />
+
+            <button
+              onClick={fetchAuditEvents}
+              disabled={loadingAudit}
+              className="rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+            >
+              {loadingAudit ? "Loading..." : "Search"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 max-h-[430px] overflow-auto rounded-2xl border border-slate-200">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Request ID</th>
+                <th className="px-4 py-3">Route</th>
+                <th className="px-4 py-3">Record ID</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Confidence</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-200">
+              {auditEvents.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-8 text-center text-slate-500"
+                  >
+                    No audit events loaded yet.
+                  </td>
+                </tr>
+              )}
+
+              {auditEvents.map((event) => (
+                <tr key={event.id}>
+                  <td className="max-w-[250px] px-4 py-4 text-xs text-slate-500">
+                    <span className="line-clamp-2 break-words">
+                      {event.created_at || "-"}
+                    </span>
+                  </td>
+                  <td className="max-w-[220px] px-4 py-4 font-semibold">
+                    <span className="line-clamp-2 break-words">
+                      {event.request_id || "-"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">{event.route || "-"}</td>
+                  <td className="px-4 py-4">{event.record_id || "-"}</td>
+                  <td className="px-4 py-4">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-bold ${
+                        event.status === "success"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {event.status || "-"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    {event.confidence_score !== null
+                      ? `${event.confidence_score} (${event.confidence_label})`
+                      : "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-3 text-xs text-slate-500">
+          Showing 6 visible rows. Additional records are available by scrolling.
+        </p>
+      </section>
+    </div>
   );
 }
 
@@ -856,6 +1159,61 @@ function StatusItem({ label, status }: { label: string; status: string }) {
       <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
         {status}
       </span>
+    </div>
+  );
+}
+
+function HealthRow({
+  label,
+  status,
+  message,
+}: {
+  label: string;
+  status: string;
+  message: string;
+}) {
+  const statusClass =
+    status === "healthy" || status === "active"
+      ? "bg-green-100 text-green-700"
+      : status === "warning" || status === "future"
+      ? "bg-orange-100 text-orange-700"
+      : status === "-"
+      ? "bg-slate-100 text-slate-600"
+      : "bg-red-100 text-red-700";
+
+  return (
+    <div className="rounded-2xl border border-slate-200 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-semibold">{label}</p>
+        <span
+          className={`rounded-full px-2 py-1 text-xs font-bold capitalize ${statusClass}`}
+        >
+          {status}
+        </span>
+      </div>
+      <p className="mt-2 line-clamp-3 text-xs text-slate-500">{message}</p>
+    </div>
+  );
+}
+
+function GovernanceCard({
+  title,
+  status,
+  description,
+}: {
+  title: string;
+  status: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-semibold">{title}</p>
+        <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+          {status}
+        </span>
+      </div>
+      <p className="mt-2 line-clamp-3 text-sm text-slate-500">{description}</p>
     </div>
   );
 }
