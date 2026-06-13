@@ -7,6 +7,7 @@ from app.routers import documents
 from app.routers import memory
 from app.routers import operations
 from app.services.azure_sql_service import test_sql_connection
+from app.routers import audit
 
 
 app = FastAPI(title=settings.app_name)
@@ -26,6 +27,7 @@ app.include_router(documents.router)
 app.include_router(operations.router)
 app.include_router(copilot.router)
 app.include_router(memory.router)
+app.include_router(audit.router)
 
 @app.get("/")
 def root():

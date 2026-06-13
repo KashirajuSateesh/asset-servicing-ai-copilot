@@ -71,3 +71,50 @@ def save_audit_event(
     container.create_item(body=audit_document)
 
     return audit_document
+
+def list_audit_events(
+    conversation_id: str,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    Lists audit events for a conversation.
+
+    Why this is useful:
+    Audit events are different from agent memory state.
+    Memory is used for follow-up context.
+    Audit events are used for observability, traceability, and compliance.
+
+    This function only returns documents where:
+    document_type = audit_event
+    """
+
+    container = get_cosmos_container()
+
+    query = """
+    SELECT * FROM c
+    WHERE c.conversation_id = @conversation_id
+    AND c.document_type = @document_type
+    ORDER BY c.created_at DESC
+    """
+
+    parameters = [
+        {
+            "name": "@conversation_id",
+            "value": conversation_id,
+        },
+        {
+            "name": "@document_type",
+            "value": "audit_event",
+        },
+    ]
+
+    results = list(
+        container.query_items(
+            query=query,
+            parameters=parameters,
+            partition_key=conversation_id,
+            max_item_count=limit,
+        )
+    )
+
+    return results[:limit]
