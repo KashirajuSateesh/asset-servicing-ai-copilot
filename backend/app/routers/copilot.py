@@ -10,19 +10,25 @@ router = APIRouter(
 
 
 @router.get("/ask")
-def ask_copilot(query: str, top_k: int = 8):
+def ask_copilot(
+    query: str,
+    top_k: int = 8,
+    conversation_id: str | None = None,
+):
     """
     Main copilot endpoint.
 
     What this endpoint does:
     1. Accepts a natural language user question.
-    2. Sends it to the orchestrator service.
-    3. The orchestrator decides which backend flow to use:
+    2. Optionally accepts a conversation_id for persistent memory.
+    3. Sends the query to the orchestrator service.
+    4. The orchestrator decides which backend flow to use:
        - operational guidance if a record ID is found
        - document RAG if no record ID is found
-    4. Returns the routed response.
+    5. Saves agent state to Cosmos DB when conversation_id is provided.
+    6. Returns the routed response.
 
-    This is the first version of the Orchestrator Agent endpoint.
+    This is the first memory-enabled Orchestrator Agent endpoint.
     """
 
     try:
@@ -34,9 +40,11 @@ def ask_copilot(query: str, top_k: int = 8):
             )
 
         # Route the user query to the correct backend flow.
+        # If conversation_id is provided, the orchestrator will save state.
         response = orchestrate_user_query(
             query=query,
             top_k=top_k,
+            conversation_id=conversation_id,
         )
 
         return response
