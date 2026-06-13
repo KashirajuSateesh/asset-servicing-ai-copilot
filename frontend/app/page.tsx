@@ -45,6 +45,9 @@ export default function Home() {
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+  
+  const copilotApiKey =
+    process.env.NEXT_PUBLIC_COPILOT_API_KEY || "dev-copilot-key-123";
 
   const answer =
     result?.response?.policy_guidance?.answer || result?.response?.answer || "";
@@ -78,7 +81,11 @@ export default function Home() {
         conversation_id: conversationId,
       });
 
-      const response = await fetch(`${apiBaseUrl}/copilot/ask?${params}`);
+      const response = await fetch(`${apiBaseUrl}/copilot/ask?${params}`, {
+        headers: {
+          "x-copilot-api-key": copilotApiKey,
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Backend error: ${response.status}`);

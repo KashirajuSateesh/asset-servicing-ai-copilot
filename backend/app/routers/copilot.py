@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from app.security.api_key_auth import verify_copilot_api_key
 
 from app.services.orchestrator_service import orchestrate_user_query
 
@@ -14,6 +15,7 @@ def ask_copilot(
     query: str,
     top_k: int = 8,
     conversation_id: str | None = None,
+    authorized: bool = Depends(verify_copilot_api_key),
 ):
     """
     Main copilot endpoint.

@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     app_name: str = "Asset Servicing AI Copilot API"
     app_env: str = "development"
 
+    copilot_api_key: str | None = None
+
      # OpenAI
     openai_api_key: str | None = None
 
