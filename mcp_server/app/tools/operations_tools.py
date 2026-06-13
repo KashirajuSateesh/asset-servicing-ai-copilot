@@ -23,3 +23,38 @@ async def get_operational_guidance(record_id: str, top_k: int = 8) -> dict:
             "top_k": top_k,
         },
     )
+
+
+async def ask_policy_documents(
+    query: str,
+    top_k: int = 8,
+    business_domain: str | None = None,
+) -> dict:
+    """
+    MCP tool function for asking policy/SOP document questions.
+
+    What this tool does:
+    1. Accepts a natural language policy question.
+    2. Calls the FastAPI backend RAG endpoint.
+    3. Returns the generated answer with citations and confidence score.
+
+    Example questions:
+    - When should settlement exceptions be escalated?
+    - What evidence is needed for reconciliation breaks?
+    - How should corporate action elections be processed?
+    """
+
+    params = {
+        "query": query,
+        "top_k": top_k,
+    }
+
+    # business_domain is optional.
+    # If provided, backend retrieval will filter to that domain.
+    if business_domain:
+        params["business_domain"] = business_domain
+
+    return await call_backend_get(
+        path="/documents/ask",
+        params=params,
+    )

@@ -1,6 +1,9 @@
 from mcp.server.fastmcp import FastMCP
 
-from app.tools.operations_tools import get_operational_guidance
+from app.tools.operations_tools import (
+    ask_policy_documents,
+    get_operational_guidance,
+)
 
 
 # Create MCP server instance.
@@ -32,6 +35,40 @@ async def operational_guidance(record_id: str, top_k: int = 8) -> dict:
     return await get_operational_guidance(
         record_id=record_id,
         top_k=top_k,
+    )
+
+
+@mcp.tool()
+async def policy_document_answer(
+    query: str,
+    top_k: int = 8,
+    business_domain: str | None = None,
+) -> dict:
+    """
+    Answer a policy or SOP question using indexed documents.
+
+    Use this tool when the user asks a general policy, SOP, SLA,
+    evidence, escalation, reconciliation, custody, settlement, or
+    corporate-actions question without a specific operational record ID.
+
+    Optional business_domain values:
+    - settlement
+    - reconciliation
+    - custody
+    - corporate_actions
+    - sla_escalation
+
+    The tool returns:
+    - generated answer
+    - citations
+    - confidence score
+    - human review flag
+    """
+
+    return await ask_policy_documents(
+        query=query,
+        top_k=top_k,
+        business_domain=business_domain,
     )
 
 
