@@ -58,3 +58,20 @@ async def ask_policy_documents(
         path="/documents/ask",
         params=params,
     )
+
+
+async def get_latest_memory_state(conversation_id: str) -> dict:
+    """
+    MCP tool function for retrieving latest conversation memory.
+
+    What this tool does:
+    1. Accepts a conversation ID.
+    2. Calls the FastAPI backend memory endpoint.
+    3. Returns the latest saved agent state from Cosmos DB.
+
+    This helps the agent continue follow-up questions using persistent memory.
+    """
+
+    return await call_backend_get(
+        path=f"/memory/state/latest/{conversation_id}",
+    )

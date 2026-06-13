@@ -3,6 +3,7 @@ from mcp.server.fastmcp import FastMCP
 from app.tools.operations_tools import (
     ask_policy_documents,
     get_operational_guidance,
+    get_latest_memory_state,
 )
 
 
@@ -69,6 +70,29 @@ async def policy_document_answer(
         query=query,
         top_k=top_k,
         business_domain=business_domain,
+    )
+
+
+@mcp.tool()
+async def latest_memory_state(conversation_id: str) -> dict:
+    """
+    Get the latest saved memory state for a conversation.
+
+    Use this tool when the user asks a follow-up question and the agent
+    needs to recover previous context.
+
+    The tool returns:
+    - latest user query
+    - previous route
+    - record ID if available
+    - business domain
+    - confidence score
+    - human review flag
+    - response summary
+    """
+
+    return await get_latest_memory_state(
+        conversation_id=conversation_id,
     )
 
 
