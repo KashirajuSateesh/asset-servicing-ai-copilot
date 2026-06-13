@@ -6,6 +6,7 @@ from app.services.cosmos_memory_service import (
 )
 from app.services.operational_guidance_service import generate_operational_guidance
 from app.services.rag_answer_service import generate_rag_answer
+from app.services.audit_log_service import save_audit_event
 
 
 def extract_record_id(query: str) -> str | None:
@@ -160,6 +161,22 @@ def orchestrate_user_query(
                 human_review_required=policy_guidance.get("human_review_required"),
             )
 
+        # Save audit event for observability and traceability.
+        save_audit_event(
+            event_type="copilot_request",
+            route="operational_guidance",
+            conversation_id=conversation_id,
+            user_query=query,
+            record_id=record_id,
+            business_domain=guidance_response.get("business_domain"),
+            confidence_score=policy_guidance.get("confidence_score"),
+            confidence_label=policy_guidance.get("confidence_label"),
+            human_review_required=policy_guidance.get("human_review_required"),
+            memory_used=memory_used,
+            memory_saved=conversation_id is not None,
+            status="success",
+        )
+
         return {
             "query": query,
             "conversation_id": conversation_id,
@@ -194,6 +211,22 @@ def orchestrate_user_query(
             confidence_label=rag_response.get("confidence_label"),
             human_review_required=rag_response.get("human_review_required"),
         )
+
+     # Save audit event for observability and traceability.
+    save_audit_event(
+        event_type="copilot_request",
+        route="document_rag",
+        conversation_id=conversation_id,
+        user_query=query,
+        record_id=None,
+        business_domain=rag_response.get("business_domain"),
+        confidence_score=rag_response.get("confidence_score"),
+        confidence_label=rag_response.get("confidence_label"),
+        human_review_required=rag_response.get("human_review_required"),
+        memory_used=memory_used,
+        memory_saved=conversation_id is not None,
+        status="success",
+    )
 
     return {
         "query": query,
