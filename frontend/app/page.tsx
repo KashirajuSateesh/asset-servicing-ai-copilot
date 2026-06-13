@@ -263,11 +263,12 @@ export default function Home() {
               <h2 className="text-lg font-semibold">Security & Observability</h2>
 
               <div className="mt-4 grid gap-3 text-sm">
+                <StatusItem label="API key protection" status="Active" />
                 <StatusItem label="Audit logs" status="Active" />
                 <StatusItem label="Cosmos memory tracking" status="Active" />
                 <StatusItem label="Confidence monitoring" status="Active" />
                 <StatusItem label="Human review flag" status="Active" />
-                <StatusItem label="RBAC / Auth" status="Planned" />
+                <StatusItem label="Azure Entra ID / RBAC" status="Future" />
               </div>
 
               <div className="mt-5">
