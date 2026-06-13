@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Shuffle,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 type PageKey =
   | "dashboard"
@@ -31,7 +31,41 @@ type PageKey =
 type NavigationItem = {
   key: PageKey;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
+};
+
+type Citation = {
+  source_number: number;
+  document_name: string;
+  page_number: number;
+  chunk_index: number;
+  business_domain: string;
+  source_blob_name: string;
+  score: number;
+};
+
+type CopilotResponse = {
+  query: string;
+  conversation_id?: string;
+  request_id?: string | null;
+  route: string;
+  record_id?: string | null;
+  memory_used?: boolean;
+  memory_saved?: boolean;
+  response: {
+    answer?: string;
+    confidence_score?: number;
+    confidence_label?: string;
+    human_review_required?: boolean;
+    citations?: Citation[];
+    policy_guidance?: {
+      answer: string;
+      confidence_score: number;
+      confidence_label: string;
+      human_review_required: boolean;
+      citations: Citation[];
+    };
+  };
 };
 
 const navigationItems: NavigationItem[] = [
@@ -90,7 +124,7 @@ export default function Home() {
 
           <section className="flex-1 overflow-y-auto p-8">
             {activePage === "dashboard" && <DashboardPage />}
-            {activePage === "copilot" && <CopilotPagePlaceholder />}
+            {activePage === "copilot" && <CopilotPage />}
             {activePage === "documents" && <DocumentsPage />}
             {activePage === "exceptions" && <ExceptionsPage />}
             {activePage === "reconciliation" && <ReconciliationPage />}
@@ -117,6 +151,7 @@ function Sidebar({
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300">
           <Bot className="h-6 w-6" />
         </div>
+
         <div>
           <h1 className="text-lg font-bold">Asset Servicing</h1>
           <p className="text-xs text-slate-300">AI Copilot</p>
@@ -149,6 +184,7 @@ function Sidebar({
           <RefreshCcw className="h-4 w-4" />
           <span>Data refreshed from live services</span>
         </div>
+
         <p className="mt-3 text-slate-400">
           Azure SQL • AI Search • Cosmos DB
         </p>
@@ -209,7 +245,12 @@ function DashboardPage() {
           tone="success"
         />
         <KpiCard title="Active Cases" value="320" change="+5.4%" tone="info" />
-        <KpiCard title="SLA Risk Cases" value="48" change="+14.3%" tone="danger" />
+        <KpiCard
+          title="SLA Risk Cases"
+          value="48"
+          change="+14.3%"
+          tone="danger"
+        />
         <KpiCard
           title="Avg Response Time Saved"
           value="2.6 hrs"
@@ -221,6 +262,7 @@ function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold">Exceptions & Breaks Trend</h2>
+
           <div className="mt-5 flex h-72 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
             Trend chart placeholder
           </div>
@@ -228,6 +270,7 @@ function DashboardPage() {
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold">What this project does</h2>
+
           <div className="mt-5 space-y-5">
             <CapabilityItem
               icon={<FileText className="h-5 w-5" />}
@@ -255,6 +298,7 @@ function DashboardPage() {
 
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold">Priority Queues</h2>
+
         <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
@@ -266,6 +310,7 @@ function DashboardPage() {
                 <th className="px-4 py-3">Owner</th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-slate-200">
               <QueueRow
                 queue="Settlement Exceptions"
@@ -303,12 +348,311 @@ function DashboardPage() {
   );
 }
 
-function CopilotPagePlaceholder() {
+function CopilotPage() {
+  const [query, setQuery] = useState("");
+  const [lastAskedQuestion, setLastAskedQuestion] = useState("");
+  const [conversationId, setConversationId] = useState("conv_demo_ui_001");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<CopilotResponse | null>(null);
+  const [error, setError] = useState("");
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  const copilotApiKey =
+    process.env.NEXT_PUBLIC_COPILOT_API_KEY || "dev-copilot-key-123";
+
+  const answer =
+    result?.response?.policy_guidance?.answer || result?.response?.answer || "";
+
+  const confidenceScore =
+    result?.response?.policy_guidance?.confidence_score ||
+    result?.response?.confidence_score;
+
+  const confidenceLabel =
+    result?.response?.policy_guidance?.confidence_label ||
+    result?.response?.confidence_label;
+
+  const humanReviewRequired =
+    result?.response?.policy_guidance?.human_review_required ??
+    result?.response?.human_review_required;
+
+  const citations =
+    result?.response?.policy_guidance?.citations ||
+    result?.response?.citations ||
+    [];
+
+  async function askCopilot() {
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setLastAskedQuestion(query);
+
+    try {
+      const params = new URLSearchParams({
+        query,
+        top_k: "8",
+        conversation_id: conversationId,
+      });
+
+      const response = await fetch(`${apiBaseUrl}/copilot/ask?${params}`, {
+        headers: {
+          "x-copilot-api-key": copilotApiKey,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setResult(data);
+      setQuery("");
+
+      const auditResponse = await fetch(
+        `${apiBaseUrl}/audit/events/${conversationId}?limit=5`
+      );
+
+      if (auditResponse.ok) {
+        const auditData = await auditResponse.json();
+        setAuditEvents(auditData.events || []);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while calling the copilot."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <PlaceholderPage
-      title="Ask Copilot"
-      description="Next step: move your working copilot chat, citations, audit logs, request ID, and system health panels into this page."
-    />
+    <div className="space-y-8">
+      <PageHeader
+        title="Ask Copilot"
+        description="Ask policy questions or record-specific questions. The orchestrator routes requests to SQL + RAG or document RAG."
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold">Copilot Chat</h2>
+              <p className="text-sm text-slate-500">
+                Protected endpoint: /copilot/ask
+              </p>
+            </div>
+
+            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+              Backend Connected
+            </span>
+          </div>
+
+          <label className="text-sm font-semibold">Conversation ID</label>
+          <input
+            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+            value={conversationId}
+            onChange={(event) => setConversationId(event.target.value)}
+          />
+
+          <label className="mt-5 block text-sm font-semibold">Question</label>
+          <textarea
+            className="mt-2 min-h-32 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+            value={query}
+            placeholder="Ask about settlement exceptions, reconciliation breaks, custody policies, or enter an ID like EXC-000001, BRK-0000001, TRD-0000001..."
+            onChange={(event) => setQuery(event.target.value)}
+          />
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              onClick={askCopilot}
+              disabled={loading || !query.trim()}
+              className="rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {loading ? "Thinking..." : "Ask Copilot"}
+            </button>
+
+            <button
+              onClick={() => setQuery("What should I do next?")}
+              className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-50"
+            >
+              Example: Follow-up
+            </button>
+
+            <button
+              onClick={() =>
+                setQuery("When should settlement exceptions be escalated?")
+              }
+              className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-50"
+            >
+              Example: Policy Question
+            </button>
+          </div>
+
+          {error && (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+              {lastAskedQuestion && (
+                <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-xs font-bold uppercase text-blue-600">
+                    You asked
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-blue-950">
+                    {lastAskedQuestion}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">Answer</h3>
+
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                  {confidenceLabel || "unknown"}
+                </span>
+              </div>
+
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {answer}
+              </p>
+
+              {citations.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-bold">Citations</h4>
+
+                  <div className="mt-3 grid gap-3">
+                    {citations.map((citation) => (
+                      <div
+                        key={`${citation.document_name}-${citation.chunk_index}-${citation.source_number}`}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-bold text-slate-800">
+                            Source {citation.source_number}:{" "}
+                            {citation.document_name}
+                          </p>
+
+                          <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                            Page {citation.page_number}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-slate-500">
+                          Domain: {citation.business_domain} • Chunk:{" "}
+                          {citation.chunk_index} • Score:{" "}
+                          {citation.score?.toFixed
+                            ? citation.score.toFixed(4)
+                            : citation.score}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <aside className="space-y-6">
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold">Route & Memory</h2>
+
+            <div className="mt-4 space-y-3 text-sm">
+              <InfoRow label="Request ID" value={result?.request_id || "-"} />
+              <InfoRow label="Route" value={result?.route || "-"} />
+              <InfoRow label="Record ID" value={result?.record_id || "-"} />
+              <InfoRow
+                label="Memory Used"
+                value={String(result?.memory_used ?? "-")}
+              />
+              <InfoRow
+                label="Memory Saved"
+                value={String(result?.memory_saved ?? "-")}
+              />
+              <InfoRow
+                label="Confidence"
+                value={
+                  confidenceScore !== undefined
+                    ? `${confidenceScore} (${confidenceLabel})`
+                    : "-"
+                }
+              />
+              <InfoRow
+                label="Human Review"
+                value={String(humanReviewRequired ?? "-")}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold">Security & Observability</h2>
+
+            <div className="mt-4 grid gap-3 text-sm">
+              <StatusItem label="API key protection" status="Active" />
+              <StatusItem label="Audit logs" status="Active" />
+              <StatusItem label="Cosmos memory tracking" status="Active" />
+              <StatusItem label="Confidence monitoring" status="Active" />
+              <StatusItem label="Human review flag" status="Active" />
+              <StatusItem label="Azure Entra ID / RBAC" status="Future" />
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-bold text-slate-700">
+                Latest Audit Events
+              </h3>
+
+              <div className="mt-3 space-y-3">
+                {auditEvents.length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    Audit events will appear after a copilot request.
+                  </p>
+                )}
+
+                {auditEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold">
+                        {event.event_type || "audit_event"}
+                      </p>
+
+                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
+                        {event.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-1 text-xs text-slate-600">
+                      <p>Request ID: {event.request_id || "-"}</p>
+                      <p>Route: {event.route || "-"}</p>
+                      <p>Record ID: {event.record_id || "-"}</p>
+                      <p>Domain: {event.business_domain || "-"}</p>
+                      <p>
+                        Confidence:{" "}
+                        {event.confidence_score !== null
+                          ? `${event.confidence_score} (${event.confidence_label})`
+                          : "-"}
+                      </p>
+                      <p>Memory used: {String(event.memory_used)}</p>
+                      <p>Memory saved: {String(event.memory_saved)}</p>
+                      <p className="text-slate-400">{event.created_at}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
   );
 }
 
@@ -380,7 +724,9 @@ function PlaceholderPage({
       <section className="rounded-3xl bg-white p-10 shadow-sm">
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 text-center">
           <BriefcaseBusiness className="h-12 w-12 text-slate-400" />
+
           <h2 className="mt-4 text-xl font-bold">{title}</h2>
+
           <p className="mt-2 max-w-xl text-sm text-slate-500">{description}</p>
         </div>
       </section>
@@ -400,6 +746,7 @@ function PageHeader({
       <h1 className="text-3xl font-bold tracking-tight text-slate-950">
         {title}
       </h1>
+
       <p className="mt-2 text-sm text-slate-600">{description}</p>
     </div>
   );
@@ -428,9 +775,13 @@ function KpiCard({
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm">
       <p className="text-sm font-semibold text-slate-600">{title}</p>
+
       <div className="mt-4 flex items-end justify-between">
         <p className="text-3xl font-bold">{value}</p>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
+
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}
+        >
           {change}
         </span>
       </div>
@@ -443,7 +794,7 @@ function CapabilityItem({
   title,
   description,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   description: string;
 }) {
@@ -452,6 +803,7 @@ function CapabilityItem({
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
         {icon}
       </div>
+
       <div>
         <p className="font-semibold">{title}</p>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
@@ -481,5 +833,29 @@ function QueueRow({
       <td className="px-4 py-4">{status}</td>
       <td className="px-4 py-4">{owner}</td>
     </tr>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+      <span className="text-slate-500">{label}</span>
+
+      <span className="max-w-[220px] truncate text-right font-semibold text-slate-900">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function StatusItem({ label, status }: { label: string; status: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
+      <span>{label}</span>
+
+      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+        {status}
+      </span>
+    </div>
   );
 }
