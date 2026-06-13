@@ -23,7 +23,6 @@ def extract_record_id(query: str) -> str | None:
     operational guidance flow.
     """
 
-    # Supported record ID formats in our synthetic operational dataset.
     patterns = [
         r"TRD-\d+",
         r"EXC-\d+",
@@ -97,6 +96,7 @@ def orchestrate_user_query(
     query: str,
     top_k: int = 8,
     conversation_id: str | None = None,
+    request_id: str | None = None,
 ) -> dict:
     """
     Main orchestration service for the copilot.
@@ -108,12 +108,12 @@ def orchestrate_user_query(
     4. If record ID exists or is recovered from memory, routes to operational guidance.
     5. If no record ID exists, routes to document RAG.
     6. Saves agent state into Cosmos DB when conversation_id is provided.
-    7. Returns a consistent response with route and memory information.
+    7. Saves audit event with request_id for traceability.
+    8. Returns a consistent response with route and memory information.
 
-    conversation_id is optional:
-    - If provided, state is saved to Cosmos DB.
-    - If provided during follow-up, previous record_id can be reused.
-    - If not provided, the copilot still works without memory.
+    request_id is optional:
+    - It comes from backend middleware.
+    - It helps trace one request across frontend, backend, and Cosmos audit logs.
     """
 
     # Step 1: Try to find a record ID directly in the current query.
@@ -175,11 +175,13 @@ def orchestrate_user_query(
             memory_used=memory_used,
             memory_saved=conversation_id is not None,
             status="success",
+            request_id=request_id,
         )
 
         return {
             "query": query,
             "conversation_id": conversation_id,
+            "request_id": request_id,
             "route": "operational_guidance",
             "record_id": record_id,
             "memory_used": memory_used,
@@ -212,7 +214,7 @@ def orchestrate_user_query(
             human_review_required=rag_response.get("human_review_required"),
         )
 
-     # Save audit event for observability and traceability.
+    # Save audit event for observability and traceability.
     save_audit_event(
         event_type="copilot_request",
         route="document_rag",
@@ -226,11 +228,13 @@ def orchestrate_user_query(
         memory_used=memory_used,
         memory_saved=conversation_id is not None,
         status="success",
+        request_id=request_id,
     )
 
     return {
         "query": query,
         "conversation_id": conversation_id,
+        "request_id": request_id,
         "route": "document_rag",
         "record_id": None,
         "memory_used": memory_used,

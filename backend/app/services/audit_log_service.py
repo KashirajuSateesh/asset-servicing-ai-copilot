@@ -28,6 +28,7 @@ def save_audit_event(
     memory_saved: bool | None = None,
     status: str = "success",
     error_message: str | None = None,
+    request_id: str | None = None,
 ) -> dict:
     """
     Saves an audit event into Cosmos DB.
@@ -39,6 +40,7 @@ def save_audit_event(
     - Was memory used?
     - Was human review required?
     - Did the request fail?
+    - Which request ID can be used to trace this request?
 
     We store this as a separate document type inside the same Cosmos container.
     """
@@ -54,6 +56,7 @@ def save_audit_event(
         "document_type": "audit_event",
         "event_type": event_type,
         "conversation_id": partition_conversation_id,
+        "request_id": request_id,
         "user_query": user_query,
         "route": route,
         "record_id": record_id,
@@ -71,6 +74,7 @@ def save_audit_event(
     container.create_item(body=audit_document)
 
     return audit_document
+
 
 def list_audit_events(
     conversation_id: str,

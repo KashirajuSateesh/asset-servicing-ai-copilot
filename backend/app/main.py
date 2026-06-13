@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+import uuid
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -10,7 +12,36 @@ from app.services.azure_sql_service import test_sql_connection
 from app.routers import audit
 
 
+
 app = FastAPI(title=settings.app_name)
+
+@app.middleware("http")
+async def add_request_id_middleware(request: Request, call_next):
+    """
+    Adds a unique request ID to every backend request.
+
+    Why this is useful:
+    If a request fails, we can trace the same request across
+    frontend logs, backend logs, and audit records.
+
+    The request ID is returned in the response header:
+    x-request-id
+    """
+
+    # Use incoming request ID if the client already sends one.
+    # Otherwise create a new UUID.
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+
+    # Store the request ID in request.state so routers/services can use it later.
+    request.state.request_id = request_id
+
+    # Continue processing the request.
+    response = await call_next(request)
+
+    # Return request ID back to the client.
+    response.headers["x-request-id"] = request_id
+
+    return response
 
 app.add_middleware(
     CORSMiddleware,
