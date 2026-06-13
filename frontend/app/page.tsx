@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Citation = {
   source_number: number;
@@ -36,6 +36,36 @@ type CopilotResponse = {
   };
 };
 
+type SystemHealthResponse = {
+  overall_status: string;
+  components: {
+    backend?: {
+      status: string;
+      message: string;
+    };
+    azure_sql?: {
+      status: string;
+      message: string;
+    };
+    azure_ai_search?: {
+      status: string;
+      message: string;
+    };
+    cosmos_memory_audit?: {
+      status: string;
+      message: string;
+    };
+    api_key_security?: {
+      status: string;
+      message: string;
+    };
+    audit_logging?: {
+      status: string;
+      message: string;
+    };
+  };
+};
+
 export default function Home() {
   const [query, setQuery] = useState("What should I do for EXC-000001?");
   const [conversationId, setConversationId] = useState("conv_demo_ui_001");
@@ -43,6 +73,7 @@ export default function Home() {
   const [result, setResult] = useState<CopilotResponse | null>(null);
   const [error, setError] = useState("");
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [systemHealth, setSystemHealth] = useState<SystemHealthResponse | null>(null);
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -112,6 +143,26 @@ export default function Home() {
       setLoading(false);
     }
   }
+
+  async function fetchSystemHealth() {
+    try {
+      const response = await fetch(`${apiBaseUrl}/system/health`);
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      setSystemHealth(data);
+    } catch {
+      // If health check fails, we do not block the main copilot UI.
+      setSystemHealth(null);
+    }
+  }
+
+  useEffect(() => {
+    fetchSystemHealth();
+  }, []);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -258,6 +309,59 @@ export default function Home() {
                     </p>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="rounded-3xl bg-white p-6 shadow">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">System Health</h2>
+
+                <button
+                  onClick={fetchSystemHealth}
+                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase text-slate-500">
+                    Overall Status
+                  </p>
+                  <p className="mt-1 text-lg font-semibold capitalize">
+                    {systemHealth?.overall_status || "checking"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3 text-sm">
+                <StatusItem
+                  label="Backend"
+                  status={systemHealth?.components?.backend?.status || "checking"}
+                />
+                <StatusItem
+                  label="Azure SQL"
+                  status={systemHealth?.components?.azure_sql?.status || "checking"}
+                />
+                <StatusItem
+                  label="Azure AI Search"
+                  status={systemHealth?.components?.azure_ai_search?.status || "checking"}
+                />
+                <StatusItem
+                  label="Cosmos Memory / Audit"
+                  status={
+                    systemHealth?.components?.cosmos_memory_audit?.status || "checking"
+                  }
+                />
+                <StatusItem
+                  label="API Key Security"
+                  status={systemHealth?.components?.api_key_security?.status || "checking"}
+                />
+                <StatusItem
+                  label="Audit Logging"
+                  status={systemHealth?.components?.audit_logging?.status || "checking"}
+                />
               </div>
             </section>
 
