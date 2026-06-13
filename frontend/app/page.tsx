@@ -15,6 +15,7 @@ type Citation = {
 type CopilotResponse = {
   query: string;
   conversation_id?: string;
+  request_id?: string | null;
   route: string;
   record_id?: string | null;
   memory_used?: boolean;
@@ -204,6 +205,7 @@ export default function Home() {
               <h2 className="text-lg font-semibold">Route & Memory</h2>
 
               <div className="mt-4 space-y-3 text-sm">
+                <InfoRow label="Request ID" value={result?.request_id || "-"} />
                 <InfoRow label="Route" value={result?.route || "-"} />
                 <InfoRow label="Record ID" value={result?.record_id || "-"} />
                 <InfoRow
@@ -298,6 +300,7 @@ export default function Home() {
                       </div>
 
                       <div className="mt-2 space-y-1 text-xs text-slate-600">
+                        <p>Request ID: {event.request_id || "-"}</p>
                         <p>Route: {event.route || "-"}</p>
                         <p>Record ID: {event.record_id || "-"}</p>
                         <p>Domain: {event.business_domain || "-"}</p>
