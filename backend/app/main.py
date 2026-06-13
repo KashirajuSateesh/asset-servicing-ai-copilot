@@ -1,21 +1,31 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import documents, operations, copilot, memory
+from app.routers import copilot
+from app.routers import documents
+from app.routers import memory
+from app.routers import operations
 from app.services.azure_sql_service import test_sql_connection
 
 
-app = FastAPI(
-    title=settings.app_name,
-    description="Backend API for Asset Servicing AI Copilot project",
-    version="0.1.0",
+app = FastAPI(title=settings.app_name)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(documents.router)
 app.include_router(operations.router)
 app.include_router(copilot.router)
 app.include_router(memory.router)
-
 
 @app.get("/")
 def root():
