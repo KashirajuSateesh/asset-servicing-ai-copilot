@@ -1,453 +1,485 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  BarChart3,
+  Bot,
+  BriefcaseBusiness,
+  Database,
+  FileText,
+  FolderOpen,
+  Gauge,
+  LayoutDashboard,
+  RefreshCcw,
+  Search,
+  Settings,
+  ShieldCheck,
+  Shuffle,
+} from "lucide-react";
+import { useState } from "react";
 
-type Citation = {
-  source_number: number;
-  document_name: string;
-  page_number: number;
-  chunk_index: number;
-  business_domain: string;
-  source_blob_name: string;
-  score: number;
+type PageKey =
+  | "dashboard"
+  | "copilot"
+  | "documents"
+  | "exceptions"
+  | "reconciliation"
+  | "cases"
+  | "analytics"
+  | "admin";
+
+type NavigationItem = {
+  key: PageKey;
+  label: string;
+  icon: React.ReactNode;
 };
 
-type CopilotResponse = {
-  query: string;
-  conversation_id?: string;
-  request_id?: string | null;
-  route: string;
-  record_id?: string | null;
-  memory_used?: boolean;
-  memory_saved?: boolean;
-  response: {
-    answer?: string;
-    confidence_score?: number;
-    confidence_label?: string;
-    human_review_required?: boolean;
-    citations?: Citation[];
-    policy_guidance?: {
-      answer: string;
-      confidence_score: number;
-      confidence_label: string;
-      human_review_required: boolean;
-      citations: Citation[];
-    };
-  };
-};
-
-type SystemHealthResponse = {
-  overall_status: string;
-  components: {
-    backend?: {
-      status: string;
-      message: string;
-    };
-    azure_sql?: {
-      status: string;
-      message: string;
-    };
-    azure_ai_search?: {
-      status: string;
-      message: string;
-    };
-    cosmos_memory_audit?: {
-      status: string;
-      message: string;
-    };
-    api_key_security?: {
-      status: string;
-      message: string;
-    };
-    audit_logging?: {
-      status: string;
-      message: string;
-    };
-  };
-};
+const navigationItems: NavigationItem[] = [
+  {
+    key: "dashboard",
+    label: "Dashboard",
+    icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    key: "copilot",
+    label: "Ask Copilot",
+    icon: <Bot className="h-5 w-5" />,
+  },
+  {
+    key: "documents",
+    label: "Documents",
+    icon: <FileText className="h-5 w-5" />,
+  },
+  {
+    key: "exceptions",
+    label: "Exceptions",
+    icon: <AlertTriangle className="h-5 w-5" />,
+  },
+  {
+    key: "reconciliation",
+    label: "Reconciliation",
+    icon: <Shuffle className="h-5 w-5" />,
+  },
+  {
+    key: "cases",
+    label: "Cases",
+    icon: <FolderOpen className="h-5 w-5" />,
+  },
+  {
+    key: "analytics",
+    label: "Analytics",
+    icon: <BarChart3 className="h-5 w-5" />,
+  },
+  {
+    key: "admin",
+    label: "Admin",
+    icon: <Settings className="h-5 w-5" />,
+  },
+];
 
 export default function Home() {
-  const [query, setQuery] = useState("What should I do for EXC-000001?");
-  const [conversationId, setConversationId] = useState("conv_demo_ui_001");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<CopilotResponse | null>(null);
-  const [error, setError] = useState("");
-  const [auditEvents, setAuditEvents] = useState<any[]>([]);
-  const [systemHealth, setSystemHealth] = useState<SystemHealthResponse | null>(null);
-
-  const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-  
-  const copilotApiKey =
-    process.env.NEXT_PUBLIC_COPILOT_API_KEY || "dev-copilot-key-123";
-
-  const answer =
-    result?.response?.policy_guidance?.answer || result?.response?.answer || "";
-
-  const confidenceScore =
-    result?.response?.policy_guidance?.confidence_score ||
-    result?.response?.confidence_score;
-
-  const confidenceLabel =
-    result?.response?.policy_guidance?.confidence_label ||
-    result?.response?.confidence_label;
-
-  const humanReviewRequired =
-    result?.response?.policy_guidance?.human_review_required ??
-    result?.response?.human_review_required;
-
-  const citations =
-    result?.response?.policy_guidance?.citations ||
-    result?.response?.citations ||
-    [];
-
-  async function askCopilot() {
-    setLoading(true);
-    setError("");
-    setResult(null);
-
-    try {
-      const params = new URLSearchParams({
-        query,
-        top_k: "8",
-        conversation_id: conversationId,
-      });
-
-      const response = await fetch(`${apiBaseUrl}/copilot/ask?${params}`, {
-        headers: {
-          "x-copilot-api-key": copilotApiKey,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Backend error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setResult(data);
-      const auditResponse = await fetch(
-        `${apiBaseUrl}/audit/events/${conversationId}?limit=5`
-      );
-
-      if (auditResponse.ok) {
-        const auditData = await auditResponse.json();
-        setAuditEvents(auditData.events || []);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong while calling the copilot."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function fetchSystemHealth() {
-    try {
-      const response = await fetch(`${apiBaseUrl}/system/health`);
-
-      if (!response.ok) {
-        return;
-      }
-
-      const data = await response.json();
-      setSystemHealth(data);
-    } catch {
-      // If health check fails, we do not block the main copilot UI.
-      setSystemHealth(null);
-    }
-  }
-
-  useEffect(() => {
-    fetchSystemHealth();
-  }, []);
+  const [activePage, setActivePage] = useState<PageKey>("dashboard");
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto max-w-7xl p-6">
-        <header className="mb-6 rounded-3xl bg-slate-950 p-6 text-white shadow-lg">
-          <p className="text-sm font-medium text-blue-300">
-            Asset Servicing AI Copilot
-          </p>
-          <h1 className="mt-2 text-3xl font-bold">
-            Operational Guidance, Policy RAG, and Persistent Agent Memory
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm text-slate-300">
-            Ask policy questions or record-specific questions. The orchestrator
-            routes the request to SQL + RAG or document RAG and saves state into
-            Cosmos DB.
-          </p>
-        </header>
+    <main className="min-h-screen bg-slate-100 text-slate-950">
+      <div className="flex min-h-screen">
+        <Sidebar activePage={activePage} setActivePage={setActivePage} />
 
-        <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-          <section className="rounded-3xl bg-white p-6 shadow">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Copilot Chat</h2>
-                <p className="text-sm text-slate-500">
-                  Main endpoint: /copilot/ask
-                </p>
-              </div>
-              <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
-                Backend Connected
-              </span>
-            </div>
+        <div className="flex min-h-screen flex-1 flex-col">
+          <Topbar />
 
-            <label className="text-sm font-medium">Conversation ID</label>
-            <input
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-              value={conversationId}
-              onChange={(event) => setConversationId(event.target.value)}
-            />
-
-            <label className="mt-4 block text-sm font-medium">Question</label>
-            <textarea
-              className="mt-2 min-h-28 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                onClick={askCopilot}
-                disabled={loading || !query.trim()}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {loading ? "Thinking..." : "Ask Copilot"}
-              </button>
-
-              <button
-                onClick={() => setQuery("What should I do next?")}
-                className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-slate-50"
-              >
-                Test Follow-up
-              </button>
-
-              <button
-                onClick={() =>
-                  setQuery("When should settlement exceptions be escalated?")
-                }
-                className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-slate-50"
-              >
-                Test Policy RAG
-              </button>
-            </div>
-
-            {error && (
-              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            {result && (
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <h3 className="text-lg font-semibold">Answer</h3>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                  {answer}
-                </p>
-              </div>
-            )}
+          <section className="flex-1 overflow-y-auto p-8">
+            {activePage === "dashboard" && <DashboardPage />}
+            {activePage === "copilot" && <CopilotPagePlaceholder />}
+            {activePage === "documents" && <DocumentsPage />}
+            {activePage === "exceptions" && <ExceptionsPage />}
+            {activePage === "reconciliation" && <ReconciliationPage />}
+            {activePage === "cases" && <CasesPage />}
+            {activePage === "analytics" && <AnalyticsPage />}
+            {activePage === "admin" && <AdminPage />}
           </section>
-
-          <aside className="space-y-6">
-            <section className="rounded-3xl bg-white p-6 shadow">
-              <h2 className="text-lg font-semibold">Route & Memory</h2>
-
-              <div className="mt-4 space-y-3 text-sm">
-                <InfoRow label="Request ID" value={result?.request_id || "-"} />
-                <InfoRow label="Route" value={result?.route || "-"} />
-                <InfoRow label="Record ID" value={result?.record_id || "-"} />
-                <InfoRow
-                  label="Memory Used"
-                  value={String(result?.memory_used ?? false)}
-                />
-                <InfoRow
-                  label="Memory Saved"
-                  value={String(result?.memory_saved ?? false)}
-                />
-                <InfoRow
-                  label="Confidence"
-                  value={
-                    confidenceScore !== undefined
-                      ? `${confidenceScore} (${confidenceLabel})`
-                      : "-"
-                  }
-                />
-                <InfoRow
-                  label="Human Review"
-                  value={String(humanReviewRequired ?? "-")}
-                />
-              </div>
-            </section>
-
-            <section className="rounded-3xl bg-white p-6 shadow">
-              <h2 className="text-lg font-semibold">Citations</h2>
-
-              <div className="mt-4 space-y-3">
-                {citations.length === 0 && (
-                  <p className="text-sm text-slate-500">
-                    Citations will appear after an answer is generated.
-                  </p>
-                )}
-
-                {citations.map((citation) => (
-                  <div
-                    key={`${citation.source_number}-${citation.document_name}-${citation.chunk_index}`}
-                    className="rounded-xl border border-slate-200 p-3"
-                  >
-                    <p className="text-sm font-semibold">
-                      [{citation.source_number}] {citation.document_name}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Page {citation.page_number} · Chunk{" "}
-                      {citation.chunk_index} · {citation.business_domain}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Score: {citation.score}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-3xl bg-white p-6 shadow">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">System Health</h2>
-
-                <button
-                  onClick={fetchSystemHealth}
-                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                >
-                  Refresh
-                </button>
-              </div>
-
-              <div className="mt-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-medium uppercase text-slate-500">
-                    Overall Status
-                  </p>
-                  <p className="mt-1 text-lg font-semibold capitalize">
-                    {systemHealth?.overall_status || "checking"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3 text-sm">
-                <StatusItem
-                  label="Backend"
-                  status={systemHealth?.components?.backend?.status || "checking"}
-                />
-                <StatusItem
-                  label="Azure SQL"
-                  status={systemHealth?.components?.azure_sql?.status || "checking"}
-                />
-                <StatusItem
-                  label="Azure AI Search"
-                  status={systemHealth?.components?.azure_ai_search?.status || "checking"}
-                />
-                <StatusItem
-                  label="Cosmos Memory / Audit"
-                  status={
-                    systemHealth?.components?.cosmos_memory_audit?.status || "checking"
-                  }
-                />
-                <StatusItem
-                  label="API Key Security"
-                  status={systemHealth?.components?.api_key_security?.status || "checking"}
-                />
-                <StatusItem
-                  label="Audit Logging"
-                  status={systemHealth?.components?.audit_logging?.status || "checking"}
-                />
-              </div>
-            </section>
-
-            <section className="rounded-3xl bg-white p-6 shadow">
-              <h2 className="text-lg font-semibold">Security & Observability</h2>
-
-              <div className="mt-4 grid gap-3 text-sm">
-                <StatusItem label="API key protection" status="Active" />
-                <StatusItem label="Audit logs" status="Active" />
-                <StatusItem label="Cosmos memory tracking" status="Active" />
-                <StatusItem label="Confidence monitoring" status="Active" />
-                <StatusItem label="Human review flag" status="Active" />
-                <StatusItem label="Azure Entra ID / RBAC" status="Future" />
-              </div>
-
-              <div className="mt-5">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  Latest Audit Events
-                </h3>
-
-                <div className="mt-3 space-y-3">
-                  {auditEvents.length === 0 && (
-                    <p className="text-sm text-slate-500">
-                      Audit events will appear after a copilot request.
-                    </p>
-                  )}
-
-                  {auditEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">
-                          {event.event_type || "audit_event"}
-                        </p>
-                        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                          {event.status}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 space-y-1 text-xs text-slate-600">
-                        <p>Request ID: {event.request_id || "-"}</p>
-                        <p>Route: {event.route || "-"}</p>
-                        <p>Record ID: {event.record_id || "-"}</p>
-                        <p>Domain: {event.business_domain || "-"}</p>
-                        <p>
-                          Confidence:{" "}
-                          {event.confidence_score !== null
-                            ? `${event.confidence_score} (${event.confidence_label})`
-                            : "-"}
-                        </p>
-                        <p>Memory used: {String(event.memory_used)}</p>
-                        <p>Memory saved: {String(event.memory_saved)}</p>
-                        <p className="text-slate-400">
-                          {event.created_at}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          </aside>
         </div>
       </div>
     </main>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function Sidebar({
+  activePage,
+  setActivePage,
+}: {
+  activePage: PageKey;
+  setActivePage: (page: PageKey) => void;
+}) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
+    <aside className="flex w-72 flex-col bg-[#061a3a] text-white">
+      <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300">
+          <Bot className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold">Asset Servicing</h1>
+          <p className="text-xs text-slate-300">AI Copilot</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-2 px-4 py-6">
+        {navigationItems.map((item) => {
+          const isActive = activePage === item.key;
+
+          return (
+            <button
+              key={item.key}
+              onClick={() => setActivePage(item.key)}
+              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+                isActive
+                  ? "bg-cyan-500/25 text-white shadow"
+                  : "text-slate-300 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-white/10 p-5 text-xs text-slate-300">
+        <div className="flex items-center gap-2">
+          <RefreshCcw className="h-4 w-4" />
+          <span>Data refreshed from live services</span>
+        </div>
+        <p className="mt-3 text-slate-400">
+          Azure SQL • AI Search • Cosmos DB
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function Topbar() {
+  return (
+    <header className="flex h-20 items-center justify-between border-b border-slate-200 bg-white px-8 shadow-sm">
+      <div className="flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <Search className="h-5 w-5 text-slate-400" />
+        <input
+          className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+          placeholder="Search for cases, exceptions, documents, policies..."
+        />
+      </div>
+
+      <div className="flex items-center gap-5">
+        <div className="hidden items-center gap-2 rounded-full bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 md:flex">
+          <ShieldCheck className="h-4 w-4" />
+          Secure Demo
+        </div>
+
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-800">
+          MM
+        </div>
+
+        <div className="hidden md:block">
+          <p className="text-sm font-semibold">Maria Martinez</p>
+          <p className="text-xs text-slate-500">Operations Manager</p>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function DashboardPage() {
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Operations Overview"
+        description="Your AI copilot for custody, settlement, reconciliation, and policy lookup."
+      />
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <KpiCard
+          title="Open Exceptions"
+          value="1,248"
+          change="+8.2%"
+          tone="warning"
+        />
+        <KpiCard
+          title="Reconciliation Breaks"
+          value="762"
+          change="-6.1%"
+          tone="success"
+        />
+        <KpiCard title="Active Cases" value="320" change="+5.4%" tone="info" />
+        <KpiCard title="SLA Risk Cases" value="48" change="+14.3%" tone="danger" />
+        <KpiCard
+          title="Avg Response Time Saved"
+          value="2.6 hrs"
+          change="+22%"
+          tone="success"
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold">Exceptions & Breaks Trend</h2>
+          <div className="mt-5 flex h-72 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+            Trend chart placeholder
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold">What this project does</h2>
+          <div className="mt-5 space-y-5">
+            <CapabilityItem
+              icon={<FileText className="h-5 w-5" />}
+              title="Citation-backed policy answers"
+              description="Answers from policy documents, procedures, and SLAs."
+            />
+            <CapabilityItem
+              icon={<Database className="h-5 w-5" />}
+              title="Live trade & case lookup"
+              description="Uses Azure SQL for operational records."
+            />
+            <CapabilityItem
+              icon={<AlertTriangle className="h-5 w-5" />}
+              title="Exception triage"
+              description="Explains exceptions and recommends next actions."
+            />
+            <CapabilityItem
+              icon={<Gauge className="h-5 w-5" />}
+              title="Operations observability"
+              description="Tracks health, audit events, and request IDs."
+            />
+          </div>
+        </section>
+      </div>
+
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold">Priority Queues</h2>
+        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Queue</th>
+                <th className="px-4 py-3">Open Items</th>
+                <th className="px-4 py-3">SLA Risk</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Owner</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              <QueueRow
+                queue="Settlement Exceptions"
+                items="1,248"
+                risk="126"
+                status="At Risk"
+                owner="Jason Smith"
+              />
+              <QueueRow
+                queue="Reconciliation Breaks"
+                items="762"
+                risk="72"
+                status="At Risk"
+                owner="Aisha Lee"
+              />
+              <QueueRow
+                queue="Corporate Actions"
+                items="315"
+                risk="18"
+                status="Monitor"
+                owner="Ravi Patel"
+              />
+              <QueueRow
+                queue="Policy Queries"
+                items="89"
+                risk="2"
+                status="On Track"
+                owner="Maria Martinez"
+              />
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
 
-function StatusItem({ label, status }: { label: string; status: string }) {
+function CopilotPagePlaceholder() {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-      <span>{label}</span>
-      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
-        {status}
-      </span>
+    <PlaceholderPage
+      title="Ask Copilot"
+      description="Next step: move your working copilot chat, citations, audit logs, request ID, and system health panels into this page."
+    />
+  );
+}
+
+function DocumentsPage() {
+  return (
+    <PlaceholderPage
+      title="Documents"
+      description="Policy PDFs, SOPs, SLA documents, indexing status, and document search will live here."
+    />
+  );
+}
+
+function ExceptionsPage() {
+  return (
+    <PlaceholderPage
+      title="Exceptions"
+      description="Settlement exceptions list, exception detail, AI insights, SLA risk, and recommended actions."
+    />
+  );
+}
+
+function ReconciliationPage() {
+  return (
+    <PlaceholderPage
+      title="Reconciliation Breaks"
+      description="Breaks table, AI match suggestions, aging, and resolution actions."
+    />
+  );
+}
+
+function CasesPage() {
+  return (
+    <PlaceholderPage
+      title="Cases"
+      description="Case queue, case history, linked trades, notes, and operational workflow."
+    />
+  );
+}
+
+function AnalyticsPage() {
+  return (
+    <PlaceholderPage
+      title="Analytics"
+      description="Operational KPIs, trend charts, SLA performance, response time saved, and team workload."
+    />
+  );
+}
+
+function AdminPage() {
+  return (
+    <PlaceholderPage
+      title="Admin & Observability"
+      description="System health, audit logs, security status, request tracing, and configuration checks."
+    />
+  );
+}
+
+function PlaceholderPage({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-8">
+      <PageHeader title={title} description={description} />
+
+      <section className="rounded-3xl bg-white p-10 shadow-sm">
+        <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 text-center">
+          <BriefcaseBusiness className="h-12 w-12 text-slate-400" />
+          <h2 className="mt-4 text-xl font-bold">{title}</h2>
+          <p className="mt-2 max-w-xl text-sm text-slate-500">{description}</p>
+        </div>
+      </section>
     </div>
+  );
+}
+
+function PageHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-950">
+        {title}
+      </h1>
+      <p className="mt-2 text-sm text-slate-600">{description}</p>
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  change,
+  tone,
+}: {
+  title: string;
+  value: string;
+  change: string;
+  tone: "success" | "warning" | "danger" | "info";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-green-50 text-green-700"
+      : tone === "warning"
+      ? "bg-orange-50 text-orange-700"
+      : tone === "danger"
+      ? "bg-red-50 text-red-700"
+      : "bg-blue-50 text-blue-700";
+
+  return (
+    <section className="rounded-3xl bg-white p-5 shadow-sm">
+      <p className="text-sm font-semibold text-slate-600">{title}</p>
+      <div className="mt-4 flex items-end justify-between">
+        <p className="text-3xl font-bold">{value}</p>
+        <span className={`rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
+          {change}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function CapabilityItem({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
+        {icon}
+      </div>
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function QueueRow({
+  queue,
+  items,
+  risk,
+  status,
+  owner,
+}: {
+  queue: string;
+  items: string;
+  risk: string;
+  status: string;
+  owner: string;
+}) {
+  return (
+    <tr>
+      <td className="px-4 py-4 font-semibold">{queue}</td>
+      <td className="px-4 py-4 text-blue-700">{items}</td>
+      <td className="px-4 py-4 text-red-600">{risk}</td>
+      <td className="px-4 py-4">{status}</td>
+      <td className="px-4 py-4">{owner}</td>
+    </tr>
   );
 }
