@@ -1870,10 +1870,81 @@ function CasesPage() {
 
 function AnalyticsPage() {
   return (
-    <PlaceholderPage
-      title="Analytics"
-      description="Operational KPIs, trend charts, SLA performance, response time saved, and team workload."
-    />
+    <div className="space-y-6">
+      <PageHeader
+        title="Analytics"
+        description="Monitor operational performance, SLA risk, exception volume, and AI copilot impact."
+      />
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard title="AI Requests" value="1,284" change="+18%" tone="success" />
+        <KpiCard title="Avg Confidence" value="92%" change="High" tone="success" />
+        <KpiCard title="Human Review" value="38" change="-12%" tone="warning" />
+        <KpiCard title="Time Saved" value="312 hrs" change="+24%" tone="success" />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">Operational Volume Trend</h2>
+          <p className="text-sm text-slate-500">
+            Weekly trend across exceptions, reconciliation breaks, and cases.
+          </p>
+
+          <div className="mt-5 grid gap-3">
+            <TrendBar label="Settlement Exceptions" value="78%" count="1,248" tone="warning" />
+            <TrendBar label="Reconciliation Breaks" value="56%" count="762" tone="info" />
+            <TrendBar label="Cases" value="42%" count="290" tone="success" />
+            <TrendBar label="Corporate Actions" value="31%" count="125" tone="info" />
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">SLA Risk Summary</h2>
+          <p className="text-sm text-slate-500">
+            Current operational queues ranked by SLA exposure.
+          </p>
+
+          <div className="mt-5 space-y-3">
+            <RiskItem queue="Settlement Exceptions" risk="High" count="126" />
+            <RiskItem queue="Reconciliation Breaks" risk="Medium" count="72" />
+            <RiskItem queue="Cases" risk="Medium" count="31" />
+            <RiskItem queue="Corporate Actions" risk="Low" count="18" />
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">Copilot Impact</h2>
+          <div className="mt-5 space-y-3">
+            <InfoRow label="Manual lookup reduction" value="40%" />
+            <InfoRow label="Avg answer time" value="6 sec" />
+            <InfoRow label="Citation coverage" value="96%" />
+            <InfoRow label="Escalation accuracy" value="High" />
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">Retrieval Quality</h2>
+          <div className="mt-5 space-y-3">
+            <InfoRow label="Hybrid retrieval" value="Active" />
+            <InfoRow label="Indexed chunks" value="75" />
+            <InfoRow label="Domains covered" value="5" />
+            <InfoRow label="Low-confidence answers" value="38" />
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">Governance Metrics</h2>
+          <div className="mt-5 space-y-3">
+            <InfoRow label="Audit events" value="Tracked" />
+            <InfoRow label="Request tracing" value="Active" />
+            <InfoRow label="API security" value="Active" />
+            <InfoRow label="Human review flag" value="Enabled" />
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -2364,6 +2435,76 @@ function GovernanceCard({
         </span>
       </div>
       <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+
+function TrendBar({
+  label,
+  value,
+  count,
+  tone,
+}: {
+  label: string;
+  value: string;
+  count: string;
+  tone: "success" | "warning" | "danger" | "info";
+}) {
+  const widthValue = Number(value.replace("%", ""));
+
+  const barClass =
+    tone === "success"
+      ? "bg-green-500"
+      : tone === "warning"
+      ? "bg-orange-500"
+      : tone === "danger"
+      ? "bg-red-500"
+      : "bg-blue-500";
+
+  return (
+    <div className="rounded-xl border border-slate-200 p-3">
+      <div className="flex items-center justify-between text-sm">
+        <p className="font-semibold">{label}</p>
+        <p className="text-xs font-bold text-slate-500">{count}</p>
+      </div>
+
+      <div className="mt-3 h-2 rounded-full bg-slate-100">
+        <div
+          className={`h-2 rounded-full ${barClass}`}
+          style={{ width: `${widthValue}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function RiskItem({
+  queue,
+  risk,
+  count,
+}: {
+  queue: string;
+  risk: string;
+  count: string;
+}) {
+  const riskClass =
+    risk === "High"
+      ? "bg-red-100 text-red-700"
+      : risk === "Medium"
+      ? "bg-orange-100 text-orange-700"
+      : "bg-green-100 text-green-700";
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
+      <div>
+        <p className="text-sm font-semibold">{queue}</p>
+        <p className="text-xs text-slate-500">{count} items at risk</p>
+      </div>
+
+      <span className={`rounded-full px-2 py-1 text-xs font-bold ${riskClass}`}>
+        {risk}
+      </span>
     </div>
   );
 }
