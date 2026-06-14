@@ -1582,11 +1582,289 @@ function ReconciliationPage() {
 }
 
 function CasesPage() {
+  const [caseId, setCaseId] = useState("CASE-0000001");
+  const [caseContext, setCaseContext] = useState<any | null>(null);
+  const [guidanceResult, setGuidanceResult] = useState<any | null>(null);
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [loadingGuidance, setLoadingGuidance] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function loadCaseContext() {
+    setLoadingContext(true);
+    setError("");
+    setGuidanceResult(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/operations/context/${caseId}`);
+
+      if (!response.ok) {
+        throw new Error(`Case lookup error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setCaseContext(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load case.");
+    } finally {
+      setLoadingContext(false);
+    }
+  }
+
+  async function getAiGuidance() {
+    setLoadingGuidance(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/operations/guidance/${caseId}?top_k=8`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Guidance error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setGuidanceResult(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate case guidance."
+      );
+    } finally {
+      setLoadingGuidance(false);
+    }
+  }
+
+  const recordData = caseContext?.record_data || {};
+  const guidance = guidanceResult?.policy_guidance || {};
+
   return (
-    <PlaceholderPage
-      title="Cases"
-      description="Case queue, case history, linked trades, notes, and operational workflow."
-    />
+    <div className="space-y-6">
+      <PageHeader
+        title="Cases"
+        description="Search operational cases, review case context, and generate AI-assisted next actions."
+      />
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-lg font-bold">Case Lookup</h2>
+            <p className="text-sm text-slate-500">
+              Search case records from Azure SQL.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-xl">
+            <input
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+              value={caseId}
+              placeholder="Example: CASE-0000001"
+              onChange={(event) => setCaseId(event.target.value)}
+            />
+
+            <button
+              onClick={loadCaseContext}
+              disabled={loadingContext || !caseId.trim()}
+              className="rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+            >
+              {loadingContext ? "Loading..." : "Load Case"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard title="Total Cases" value="290" change="SQL" tone="info" />
+          <KpiCard
+            title="Selected Case"
+            value={recordData.case_id || caseId}
+            change="Live"
+            tone="info"
+          />
+          <KpiCard
+            title="Case Status"
+            value={recordData.case_status || recordData.status || "-"}
+            change="Current"
+            tone="warning"
+          />
+          <KpiCard
+            title="AI Guidance"
+            value={guidanceResult ? "Ready" : "Pending"}
+            change={guidanceResult ? "Generated" : "Not Run"}
+            tone={guidanceResult ? "success" : "warning"}
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">Case Details</h2>
+          <p className="text-sm text-slate-500">
+            Operational case context retrieved from structured records.
+          </p>
+
+          {!caseContext && (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Load a case to view details.
+            </div>
+          )}
+
+          {caseContext && (
+            <div className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-bold uppercase text-blue-600">
+                  Context Summary
+                </p>
+                <p className="mt-2 text-sm font-semibold text-blue-950">
+                  {caseContext.context_summary}
+                </p>
+              </div>
+
+              <div className="grid gap-3 text-sm">
+                <InfoRow label="Case ID" value={recordData.case_id || caseId} />
+                <InfoRow
+                  label="Linked Trade"
+                  value={recordData.trade_id || "-"}
+                />
+                <InfoRow
+                  label="Linked Exception"
+                  value={recordData.exception_id || "-"}
+                />
+                <InfoRow
+                  label="Linked Break"
+                  value={recordData.break_id || "-"}
+                />
+                <InfoRow
+                  label="Case Type"
+                  value={recordData.case_type || "-"}
+                />
+                <InfoRow
+                  label="Priority"
+                  value={recordData.priority || "-"}
+                />
+                <InfoRow
+                  label="Status"
+                  value={recordData.case_status || recordData.status || "-"}
+                />
+                <InfoRow
+                  label="Assigned Team"
+                  value={recordData.assigned_team || "-"}
+                />
+                <InfoRow
+                  label="Created Date"
+                  value={recordData.created_date || "-"}
+                />
+                <InfoRow
+                  label="Resolution Notes"
+                  value={recordData.resolution_notes || recordData.notes || "-"}
+                />
+              </div>
+
+              <button
+                onClick={getAiGuidance}
+                disabled={loadingGuidance}
+                className="mt-3 w-full rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+              >
+                {loadingGuidance ? "Generating..." : "Get AI Guidance"}
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold">AI Case Guidance</h2>
+          <p className="text-sm text-slate-500">
+            Uses case context and available policy knowledge to recommend next steps.
+          </p>
+
+          {!guidanceResult && (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Load a case and click Get AI Guidance.
+            </div>
+          )}
+
+          {guidanceResult && (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-bold">Recommended Action</h3>
+
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                  {guidance.confidence_label || "unknown"}
+                </span>
+              </div>
+
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {guidance.answer}
+              </p>
+
+              <div className="mt-5 grid gap-3 text-sm">
+                <InfoRow
+                  label="Business Domain"
+                  value={guidanceResult.business_domain || "-"}
+                />
+                <InfoRow
+                  label="Confidence"
+                  value={
+                    guidance.confidence_score !== undefined
+                      ? `${guidance.confidence_score} (${guidance.confidence_label})`
+                      : "-"
+                  }
+                />
+                <InfoRow
+                  label="Human Review"
+                  value={String(guidance.human_review_required ?? "-")}
+                />
+                <InfoRow
+                  label="Record Type"
+                  value={guidanceResult.record_type || "-"}
+                />
+              </div>
+
+              {guidance.citations?.length > 0 && (
+                <div className="mt-5">
+                  <h4 className="text-sm font-bold">Policy Citations</h4>
+
+                  <div className="mt-3 max-h-[340px] space-y-3 overflow-y-auto pr-2">
+                    {guidance.citations.map((citation: Citation) => (
+                      <div
+                        key={`${citation.document_name}-${citation.chunk_index}-${citation.source_number}`}
+                        className="rounded-xl border border-slate-200 bg-white p-3 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-bold text-slate-800">
+                            Source {citation.source_number}:{" "}
+                            {citation.document_name}
+                          </p>
+
+                          <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                            Page {citation.page_number}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-slate-500">
+                          Domain: {citation.business_domain} • Chunk:{" "}
+                          {citation.chunk_index} • Score:{" "}
+                          {citation.score?.toFixed
+                            ? citation.score.toFixed(4)
+                            : citation.score}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
