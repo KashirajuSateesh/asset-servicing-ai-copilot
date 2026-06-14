@@ -18,7 +18,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type PageKey =
   | "dashboard"
@@ -27,7 +27,6 @@ type PageKey =
   | "exceptions"
   | "reconciliation"
   | "cases"
-  | "analytics"
   | "admin";
 
 type NavigationItem = {
@@ -161,11 +160,6 @@ const navigationItems: NavigationItem[] = [
     icon: <FolderOpen className="h-5 w-5" />,
   },
   {
-    key: "analytics",
-    label: "Analytics",
-    icon: <BarChart3 className="h-5 w-5" />,
-  },
-  {
     key: "admin",
     label: "Admin",
     icon: <Settings className="h-5 w-5" />,
@@ -196,7 +190,6 @@ export default function Home() {
             {activePage === "exceptions" && <ExceptionsPage />}
             {activePage === "reconciliation" && <ReconciliationPage />}
             {activePage === "cases" && <CasesPage />}
-            {activePage === "analytics" && <AnalyticsPage />}
             {activePage === "admin" && <AdminPage />}
           </section>
         </div>
@@ -319,126 +312,286 @@ function Topbar() {
 }
 
 function DashboardPage() {
+  const [analytics, setAnalytics] = useState<AnalyticsSummaryResponse | null>(
+    null
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function fetchDashboardData() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/analytics/summary`);
+
+      if (!response.ok) {
+        throw new Error(`Dashboard analytics error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAnalytics(data);
+      sessionStorage.setItem("dashboardAnalytics", JSON.stringify(data));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load dashboard data."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const cachedData = sessionStorage.getItem("dashboardAnalytics");
+
+    if (cachedData) {
+      setAnalytics(JSON.parse(cachedData));
+      return;
+    }
+
+    fetchDashboardData();
+  }, []);
+
+  const operations = analytics?.operations;
+  const aiUsage = analytics?.ai_usage;
+  const retrieval = analytics?.retrieval;
+  const summary = analytics?.summary;
+
+  const avgConfidence =
+    aiUsage?.average_confidence !== null &&
+    aiUsage?.average_confidence !== undefined
+      ? `${Math.round(aiUsage.average_confidence * 100)}%`
+      : "-";
+
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Operations Overview"
-        description="Your AI copilot for custody, settlement, reconciliation, and policy lookup."
-      />
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <PageHeader
+          title="Operations Overview"
+          description="Enterprise AI copilot for custody, settlement, reconciliation, cases, policy search, and operational guidance."
+        />
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          title="Open Exceptions"
-          value="1,248"
-          change="+8.2%"
-          tone="warning"
-        />
-        <KpiCard
-          title="Reconciliation Breaks"
-          value="762"
-          change="-6.1%"
-          tone="success"
-        />
-        <KpiCard title="Active Cases" value="320" change="+5.4%" tone="info" />
-        <KpiCard
-          title="SLA Risk Cases"
-          value="48"
-          change="+14.3%"
-          tone="danger"
-        />
-        <KpiCard
-          title="Avg Response Time Saved"
-          value="2.6 hrs"
-          change="+22%"
-          tone="success"
-        />
+        <button
+          onClick={fetchDashboardData}
+          disabled={loading}
+          className="w-fit rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+        >
+          {loading ? "Loading..." : "Refresh Dashboard"}
+        </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">Exceptions & Breaks Trend</h2>
-
-          <div className="mt-5 flex h-72 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
-            Trend chart placeholder
-          </div>
-        </section>
-
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">What this project does</h2>
-
-          <div className="mt-5 space-y-5">
-            <CapabilityItem
-              icon={<FileText className="h-5 w-5" />}
-              title="Citation-backed policy answers"
-              description="Answers from policy documents, procedures, and SLAs."
-            />
-            <CapabilityItem
-              icon={<Database className="h-5 w-5" />}
-              title="Live trade & case lookup"
-              description="Uses Azure SQL for operational records."
-            />
-            <CapabilityItem
-              icon={<AlertTriangle className="h-5 w-5" />}
-              title="Exception triage"
-              description="Explains exceptions and recommends next actions."
-            />
-            <CapabilityItem
-              icon={<Gauge className="h-5 w-5" />}
-              title="Operations observability"
-              description="Tracks health, audit events, and request IDs."
-            />
-          </div>
-        </section>
-      </div>
-
-      <section className="rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-bold">Priority Queues</h2>
-
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Queue</th>
-                <th className="px-3 py-2">Open Items</th>
-                <th className="px-3 py-2">SLA Risk</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Owner</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-200">
-              <QueueRow
-                queue="Settlement Exceptions"
-                items="1,248"
-                risk="126"
-                status="At Risk"
-                owner="Jason Smith"
-              />
-              <QueueRow
-                queue="Reconciliation Breaks"
-                items="762"
-                risk="72"
-                status="At Risk"
-                owner="Aisha Lee"
-              />
-              <QueueRow
-                queue="Corporate Actions"
-                items="315"
-                risk="18"
-                status="Monitor"
-                owner="Ravi Patel"
-              />
-              <QueueRow
-                queue="Policy Queries"
-                items="89"
-                risk="2"
-                status="On Track"
-                owner="Maria Martinez"
-              />
-            </tbody>
-          </table>
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
         </div>
-      </section>
+      )}
+
+      {!analytics && (
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+            Click Refresh Dashboard to load real metrics from Azure SQL, Cosmos
+            audit logs, and Azure AI Search summary.
+          </div>
+        </section>
+      )}
+
+      {analytics && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <KpiCard
+              title="Settlement Exceptions"
+              value={String(operations?.settlement_exceptions ?? "-")}
+              change="SQL"
+              tone="warning"
+            />
+            <KpiCard
+              title="Reconciliation Breaks"
+              value={String(operations?.reconciliation_breaks ?? "-")}
+              change="SQL"
+              tone="info"
+            />
+            <KpiCard
+              title="Case Tickets"
+              value={String(operations?.case_tickets ?? "-")}
+              change="SQL"
+              tone="success"
+            />
+            <KpiCard
+              title="AI Requests"
+              value={String(aiUsage?.total_requests ?? "-")}
+              change={avgConfidence}
+              tone="success"
+            />
+            <KpiCard
+              title="Indexed Chunks"
+              value={String(retrieval?.indexed_chunks ?? "-")}
+              change={retrieval?.retrieval_mode || "-"}
+              tone="info"
+            />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Operational Data Summary</h2>
+              <p className="text-sm text-slate-500">
+                Real table counts from Azure SQL operational data.
+              </p>
+
+              <div className="mt-5 grid gap-3">
+                <TrendBar
+                  label="Trade Status Records"
+                  value={calculatePercent(
+                    operations?.trade_status || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.trade_status ?? "-")}
+                  tone="info"
+                />
+                <TrendBar
+                  label="Reconciliation Breaks"
+                  value={calculatePercent(
+                    operations?.reconciliation_breaks || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.reconciliation_breaks ?? "-")}
+                  tone="warning"
+                />
+                <TrendBar
+                  label="Case Tickets"
+                  value={calculatePercent(
+                    operations?.case_tickets || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.case_tickets ?? "-")}
+                  tone="success"
+                />
+                <TrendBar
+                  label="Custody Accounts"
+                  value={calculatePercent(
+                    operations?.custody_accounts || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.custody_accounts ?? "-")}
+                  tone="info"
+                />
+                <TrendBar
+                  label="Settlement Exceptions"
+                  value={calculatePercent(
+                    operations?.settlement_exceptions || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.settlement_exceptions ?? "-")}
+                  tone="warning"
+                />
+                <TrendBar
+                  label="Corporate Actions"
+                  value={calculatePercent(
+                    operations?.corporate_actions || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.corporate_actions ?? "-")}
+                  tone="info"
+                />
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">What this project does</h2>
+              <p className="text-sm text-slate-500">
+                Core capabilities implemented in this AI copilot.
+              </p>
+
+              <div className="mt-5 space-y-4">
+                <CapabilityItem
+                  icon={<FileText className="h-5 w-5" />}
+                  title="Citation-backed policy answers"
+                  description="Answers are generated from indexed PDF policy chunks."
+                />
+                <CapabilityItem
+                  icon={<Database className="h-5 w-5" />}
+                  title="Live operational lookup"
+                  description="Azure SQL provides trade, exception, break, and case records."
+                />
+                <CapabilityItem
+                  icon={<Bot className="h-5 w-5" />}
+                  title="Orchestrated AI workflow"
+                  description="The orchestrator routes between SQL + RAG and document-only RAG."
+                />
+                <CapabilityItem
+                  icon={<Gauge className="h-5 w-5" />}
+                  title="Observability and governance"
+                  description="Audit events, request IDs, confidence, and human review flags are tracked."
+                />
+              </div>
+            </section>
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-3">
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">AI Usage</h2>
+              <div className="mt-5 space-y-3">
+                <InfoRow
+                  label="Total requests"
+                  value={String(aiUsage?.total_requests ?? "-")}
+                />
+                <InfoRow
+                  label="Successful requests"
+                  value={String(aiUsage?.successful_requests ?? "-")}
+                />
+                <InfoRow
+                  label="Failed requests"
+                  value={String(aiUsage?.failed_requests ?? "-")}
+                />
+                <InfoRow
+                  label="Human review required"
+                  value={String(aiUsage?.human_review_required ?? "-")}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Retrieval Readiness</h2>
+              <div className="mt-5 space-y-3">
+                <InfoRow
+                  label="Uploaded PDFs"
+                  value={String(retrieval?.uploaded_pdfs ?? "-")}
+                />
+                <InfoRow
+                  label="Indexed chunks"
+                  value={String(retrieval?.indexed_chunks ?? "-")}
+                />
+                <InfoRow
+                  label="Retrieval mode"
+                  value={retrieval?.retrieval_mode || "-"}
+                />
+                <InfoRow
+                  label="Embedding model"
+                  value={retrieval?.embedding_model || "-"}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">System Readiness</h2>
+              <div className="mt-5 space-y-3">
+                <InfoRow
+                  label="Total operational records"
+                  value={String(summary?.total_operational_records ?? "-")}
+                />
+                <InfoRow
+                  label="System status"
+                  value={summary?.system_readiness || "-"}
+                />
+                <InfoRow label="Security" value="API key active" />
+                <InfoRow label="Audit logging" value="Active" />
+              </div>
+            </section>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -752,78 +905,87 @@ function CopilotPage() {
 }
 
 function DocumentsPage() {
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<Record<string, unknown>[]>([]);
   const [documentSearch, setDocumentSearch] = useState("");
   const [loadingDocs, setLoadingDocs] = useState(false);
-  const [error, setError] = useState("");
+  const [documentsError, setDocumentsError] = useState("");
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
   async function fetchDocuments() {
     setLoadingDocs(true);
-    setError("");
+    setDocumentsError("");
 
     try {
       const response = await fetch(`${apiBaseUrl}/documents/blobs/raw-pdfs`);
 
       if (!response.ok) {
-        throw new Error(`Documents fetch error: ${response.status}`);
+        throw new Error(`Documents API error: ${response.status}`);
       }
 
       const data = await response.json();
 
-      setDocuments(data.blobs || data.documents || data || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch documents."
+      /*
+        Backend may return:
+        1. an array directly
+        2. an object like { documents: [...] }
+        3. an object like { blobs: [...] }
+        4. an object like { files: [...] }
+
+        This code safely converts all formats into an array.
+      */
+      const documentsArray = Array.isArray(data)
+        ? data
+        : Array.isArray(data.documents)
+          ? data.documents
+          : Array.isArray(data.blobs)
+            ? data.blobs
+            : Array.isArray(data.files)
+              ? data.files
+              : [];
+
+      setDocuments(documentsArray);
+      sessionStorage.setItem(
+        "documentsInventory",
+        JSON.stringify(documentsArray)
       );
+    } catch (err) {
+      setDocumentsError(
+        err instanceof Error ? err.message : "Failed to load documents."
+      );
+      setDocuments([]);
     } finally {
       setLoadingDocs(false);
     }
   }
 
-  function getDocumentName(doc: any, index: number) {
-    if (typeof doc === "string") {
-      return doc;
+  useEffect(() => {
+    const cachedData = sessionStorage.getItem("documentsInventory");
+
+    if (cachedData) {
+      try {
+        const parsedData = JSON.parse(cachedData);
+
+        const documentsArray = Array.isArray(parsedData)
+          ? parsedData
+          : Array.isArray(parsedData.documents)
+            ? parsedData.documents
+            : [];
+
+        setDocuments(documentsArray);
+        return;
+      } catch {
+        sessionStorage.removeItem("documentsInventory");
+      }
     }
 
-    return (
-      doc.name ||
-      doc.blob_name ||
-      doc.source_blob_name ||
-      doc.filename ||
-      `Document ${index + 1}`
-    );
-  }
+    fetchDocuments();
+  }, []);
 
-  function detectDocumentDomain(documentName: string) {
-    const lowerName = documentName.toLowerCase();
+  const safeDocuments = Array.isArray(documents) ? documents : [];
 
-    if (lowerName.includes("settlement")) {
-      return "Settlement";
-    }
-
-    if (lowerName.includes("reconciliation")) {
-      return "Reconciliation";
-    }
-
-    if (lowerName.includes("custody")) {
-      return "Custody";
-    }
-
-    if (lowerName.includes("corporate")) {
-      return "Corporate Actions";
-    }
-
-    if (lowerName.includes("sla")) {
-      return "SLA / Escalation";
-    }
-
-    return "General Policy";
-  }
-
-  const filteredDocuments = documents.filter((doc, index) => {
+  const filteredDocuments = safeDocuments.filter((doc, index) => {
     const name = getDocumentName(doc, index);
     const domain = detectDocumentDomain(name);
 
@@ -836,101 +998,98 @@ function DocumentsPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Documents"
-        description="View uploaded policy documents, search the knowledge base inventory, and verify indexing readiness."
-      />
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <PageHeader
+          title="Documents"
+          description="Knowledge base inventory for policy PDFs, SOPs, SLA documents, and indexed retrieval sources."
+        />
 
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
+        <button
+          onClick={fetchDocuments}
+          disabled={loadingDocs}
+          className="w-fit rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+        >
+          {loadingDocs ? "Loading..." : "Refresh Documents"}
+        </button>
+      </div>
+
+      {documentsError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {documentsError}
         </div>
       )}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="Uploaded PDFs"
+          value={String(safeDocuments.length)}
+          change="Azure Blob"
+          tone="info"
+        />
+        <KpiCard
+          title="Indexed Chunks"
+          value="75"
+          change="Azure AI Search"
+          tone="success"
+        />
+        <KpiCard
+          title="Retrieval Mode"
+          value="Hybrid"
+          change="Vector + keyword"
+          tone="success"
+        />
+        <KpiCard
+          title="Embedding Model"
+          value="OpenAI"
+          change="text-embedding-3-small"
+          tone="info"
+        />
+      </div>
 
       <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-xl font-bold">Knowledge Base Overview</h2>
+            <h2 className="text-lg font-bold">Knowledge Base Inventory</h2>
             <p className="text-sm text-slate-500">
-              Documents uploaded to Azure Blob Storage and indexed into Azure AI Search.
+              Documents load automatically. Use Refresh Documents to reload from
+              Azure Blob.
             </p>
           </div>
 
-          <button
-            onClick={fetchDocuments}
-            disabled={loadingDocs}
-            className="w-fit rounded-2xl bg-[#061a3a] px-4 py-2 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
-          >
-            {loadingDocs ? "Loading..." : "Load Documents"}
-          </button>
-        </div>
-
-        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            title="Uploaded PDFs"
-            value={documents.length > 0 ? String(documents.length) : "25"
-            }
-            change="Blob"
-            tone="success"
-          />
-          <KpiCard title="Indexed Chunks" value="75" change="Search" tone="info" />
-          <KpiCard title="Retrieval Mode" value="Hybrid" change="Active" tone="success" />
-          <KpiCard title="Embedding Model" value="OpenAI" change="1536 dim" tone="info" />
-        </div>
-      </section>
-
-      <section className="rounded-2xl bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-xl font-bold">Document Library</h2>
-            <p className="text-sm text-slate-500">
-              Search documents by name or domain. Policy answering is handled in Ask Copilot.
-            </p>
-          </div>
-
-          <div className="w-full lg:max-w-md">
-            <label className="text-sm font-semibold">Search Documents</label>
+          <div className="relative w-full lg:w-80">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <input
-              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
               value={documentSearch}
-              placeholder="Search settlement, reconciliation, custody, SLA..."
               onChange={(event) => setDocumentSearch(event.target.value)}
+              placeholder="Search documents..."
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
           </div>
         </div>
 
-        <div className="mt-6 max-h-[560px] overflow-auto rounded-2xl border border-slate-200">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
+        <div className="mt-5 max-h-[360px] overflow-auto rounded-2xl border border-slate-200">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-2">Document Name</th>
-                <th className="px-3 py-2">Domain</th>
-                <th className="px-3 py-2">Source</th>
-                <th className="px-3 py-2">Index Status</th>
-                <th className="px-3 py-2">RAG Ready</th>
+                <th className="px-4 py-3">Document Name</th>
+                <th className="px-4 py-3">Domain</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Index Status</th>
+                <th className="px-4 py-3">RAG Ready</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-200">
-              {documents.length === 0 && (
+            <tbody className="divide-y divide-slate-100">
+              {filteredDocuments.length === 0 && (
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-10 text-center text-slate-500"
+                    className="px-4 py-8 text-center text-sm text-slate-500"
                   >
-                    Click Load Documents to fetch uploaded PDFs from Azure Blob.
-                  </td>
-                </tr>
-              )}
-
-              {documents.length > 0 && filteredDocuments.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-10 text-center text-slate-500"
-                  >
-                    No documents match your search.
+                    {loadingDocs
+                      ? "Loading documents..."
+                      : "No documents found."}
                   </td>
                 </tr>
               )}
@@ -940,29 +1099,19 @@ function DocumentsPage() {
                 const domain = detectDocumentDomain(name);
 
                 return (
-                  <tr key={`${name}-${index}`}>
-                    <td className="max-w-[420px] px-4 py-4 font-semibold">
-                      <span className="line-clamp-2 break-words">{name}</span>
+                  <tr key={`${name}-${index}`} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-semibold text-slate-800">
+                      {name}
                     </td>
-
-                    <td className="px-3 py-3">
-                      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
-                        {domain}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4 text-slate-600">
-                      Azure Blob / raw-pdfs
-                    </td>
-
-                    <td className="px-3 py-3">
-                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
+                    <td className="px-4 py-3 text-slate-600">{domain}</td>
+                    <td className="px-4 py-3 text-slate-600">Azure Blob</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
                         Indexed
                       </span>
                     </td>
-
-                    <td className="px-3 py-3">
-                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                         Ready
                       </span>
                     </td>
@@ -972,38 +1121,30 @@ function DocumentsPage() {
             </tbody>
           </table>
         </div>
-
-        <p className="mt-3 text-xs text-slate-500">
-          This page is for document inventory and governance. Business users ask policy questions from the Ask Copilot page.
-        </p>
       </section>
 
-      <section className="rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-bold">Document Governance Notes</h2>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <GovernanceCard
-            title="Blob Storage Source"
-            status="Active"
-            description="Raw policy PDFs are stored in Azure Blob container raw-pdfs."
-          />
-          <GovernanceCard
-            title="OCR / Parsing"
-            status="Complete"
-            description="PDF text is extracted and converted into searchable chunks."
-          />
-          <GovernanceCard
-            title="Metadata Tagging"
-            status="Active"
-            description="Documents are tagged by domain such as settlement, custody, and reconciliation."
-          />
-          <GovernanceCard
-            title="Vector Index"
-            status="Ready"
-            description="Chunks are embedded and available through Azure AI Search hybrid retrieval."
-          />
-        </div>
-      </section>
+      <div className="grid gap-6 xl:grid-cols-4">
+        <GovernanceCard
+          title="Blob Storage Source"
+          status="raw-pdfs container"
+          description="Original source documents are stored in Azure Blob Storage."
+        />
+        <GovernanceCard
+          title="OCR / Parsing"
+          status="Document Intelligence"
+          description="PDF content is extracted with layout-aware parsing before chunking."
+        />
+        <GovernanceCard
+          title="Metadata Tagging"
+          status="Domain + document type"
+          description="Chunks are tagged for policy, SLA, reconciliation, custody, and exception workflows."
+        />
+        <GovernanceCard
+          title="Vector Index"
+          status="Azure AI Search"
+          description="Hybrid search supports citation-backed answers in the copilot."
+        />
+      </div>
     </div>
   );
 }
@@ -1897,266 +2038,6 @@ function CasesPage() {
   );
 }
 
-function AnalyticsPage() {
-  const [analytics, setAnalytics] = useState<AnalyticsSummaryResponse | null>(
-    null
-  );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
-
-  async function fetchAnalytics() {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/analytics/summary`);
-
-      if (!response.ok) {
-        throw new Error(`Analytics API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setAnalytics(data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load analytics."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const operations = analytics?.operations;
-  const aiUsage = analytics?.ai_usage;
-  const retrieval = analytics?.retrieval;
-  const summary = analytics?.summary;
-
-  const successRate =
-    aiUsage && aiUsage.total_requests > 0
-      ? Math.round((aiUsage.successful_requests / aiUsage.total_requests) * 100)
-      : 0;
-
-  const failedRate =
-    aiUsage && aiUsage.total_requests > 0
-      ? Math.round((aiUsage.failed_requests / aiUsage.total_requests) * 100)
-      : 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <PageHeader
-          title="Analytics"
-          description="Monitor operational data volume, AI usage, retrieval readiness, and governance metrics from backend services."
-        />
-
-        <button
-          onClick={fetchAnalytics}
-          disabled={loading}
-          className="w-fit rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
-        >
-          {loading ? "Loading..." : "Refresh Analytics"}
-        </button>
-      </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {!analytics && (
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
-            Click Refresh Analytics to load real metrics from Azure SQL, Cosmos
-            audit logs, and retrieval/indexing summary.
-          </div>
-        </section>
-      )}
-
-      {analytics && (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              title="Operational Records"
-              value={String(summary?.total_operational_records ?? "-")}
-              change={summary?.system_readiness || "status"}
-              tone="success"
-            />
-            <KpiCard
-              title="AI Requests"
-              value={String(aiUsage?.total_requests ?? "-")}
-              change={`${successRate}% success`}
-              tone="success"
-            />
-            <KpiCard
-              title="Avg Confidence"
-              value={
-                aiUsage?.average_confidence !== null &&
-                aiUsage?.average_confidence !== undefined
-                  ? `${Math.round(aiUsage.average_confidence * 100)}%`
-                  : "-"
-              }
-              change="Cosmos"
-              tone="success"
-            />
-            <KpiCard
-              title="Indexed Chunks"
-              value={String(retrieval?.indexed_chunks ?? "-")}
-              change={retrieval?.retrieval_mode || "-"}
-              tone="info"
-            />
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold">Operational Data Volume</h2>
-              <p className="text-sm text-slate-500">
-                Real row counts from Azure SQL operational tables.
-              </p>
-
-              <div className="mt-5 grid gap-3">
-                <TrendBar
-                  label="Settlement Exceptions"
-                  value={calculatePercent(
-                    operations?.settlement_exceptions || 0,
-                    summary?.total_operational_records || 1
-                  )}
-                  count={String(operations?.settlement_exceptions ?? "-")}
-                  tone="warning"
-                />
-                <TrendBar
-                  label="Reconciliation Breaks"
-                  value={calculatePercent(
-                    operations?.reconciliation_breaks || 0,
-                    summary?.total_operational_records || 1
-                  )}
-                  count={String(operations?.reconciliation_breaks ?? "-")}
-                  tone="info"
-                />
-                <TrendBar
-                  label="Case Tickets"
-                  value={calculatePercent(
-                    operations?.case_tickets || 0,
-                    summary?.total_operational_records || 1
-                  )}
-                  count={String(operations?.case_tickets ?? "-")}
-                  tone="success"
-                />
-                <TrendBar
-                  label="Trade Status"
-                  value={calculatePercent(
-                    operations?.trade_status || 0,
-                    summary?.total_operational_records || 1
-                  )}
-                  count={String(operations?.trade_status ?? "-")}
-                  tone="info"
-                />
-                <TrendBar
-                  label="Custody Accounts"
-                  value={calculatePercent(
-                    operations?.custody_accounts || 0,
-                    summary?.total_operational_records || 1
-                  )}
-                  count={String(operations?.custody_accounts ?? "-")}
-                  tone="success"
-                />
-                <TrendBar
-                  label="Corporate Actions"
-                  value={calculatePercent(
-                    operations?.corporate_actions || 0,
-                    summary?.total_operational_records || 1
-                  )}
-                  count={String(operations?.corporate_actions ?? "-")}
-                  tone="info"
-                />
-              </div>
-            </section>
-
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold">AI Usage Summary</h2>
-              <p className="text-sm text-slate-500">
-                Real metrics from Cosmos DB audit events.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                <RiskItem
-                  queue="Successful Requests"
-                  risk="Success"
-                  count={String(aiUsage?.successful_requests ?? "0")}
-                />
-                <RiskItem
-                  queue="Failed Requests"
-                  risk={failedRate > 10 ? "High" : "Low"}
-                  count={String(aiUsage?.failed_requests ?? "0")}
-                />
-                <RiskItem
-                  queue="Human Review Required"
-                  risk={
-                    (aiUsage?.human_review_required || 0) > 5 ? "Medium" : "Low"
-                  }
-                  count={String(aiUsage?.human_review_required ?? "0")}
-                />
-                <RiskItem
-                  queue="Total Audit Events"
-                  risk="Success"
-                  count={String(aiUsage?.total_requests ?? "0")}
-                />
-              </div>
-            </section>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-3">
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold">Route Usage</h2>
-              <div className="mt-5 space-y-3">
-                {Object.entries(aiUsage?.route_counts || {}).map(
-                  ([route, count]) => (
-                    <InfoRow key={route} label={route} value={String(count)} />
-                  )
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold">Retrieval Readiness</h2>
-              <div className="mt-5 space-y-3">
-                <InfoRow
-                  label="Uploaded PDFs"
-                  value={String(retrieval?.uploaded_pdfs ?? "-")}
-                />
-                <InfoRow
-                  label="Indexed chunks"
-                  value={String(retrieval?.indexed_chunks ?? "-")}
-                />
-                <InfoRow
-                  label="Retrieval mode"
-                  value={retrieval?.retrieval_mode || "-"}
-                />
-                <InfoRow
-                  label="Embedding model"
-                  value={retrieval?.embedding_model || "-"}
-                />
-              </div>
-            </section>
-
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold">Governance Metrics</h2>
-              <div className="mt-5 space-y-3">
-                <InfoRow label="Audit events" value="Tracked" />
-                <InfoRow label="Request tracing" value="Active" />
-                <InfoRow label="API security" value="Active" />
-                <InfoRow label="Human review flag" value="Enabled" />
-              </div>
-            </section>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 function AdminPage() {
   const [systemHealth, setSystemHealth] =
@@ -2725,4 +2606,50 @@ function calculatePercent(value: number, total: number) {
   }
 
   return `${Math.max(5, Math.round((value / total) * 100))}%`;
+}
+
+function getDocumentName(doc: Record<string, unknown>, index: number) {
+  const possibleName =
+    doc.name ||
+    doc.filename ||
+    doc.file_name ||
+    doc.blob_name ||
+    doc.path ||
+    doc.url;
+
+  if (typeof possibleName === "string" && possibleName.trim().length > 0) {
+    return possibleName.split("/").pop() || possibleName;
+  }
+
+  return `Document ${index + 1}`;
+}
+
+function detectDocumentDomain(documentName: string) {
+  const name = documentName.toLowerCase();
+
+  if (name.includes("recon") || name.includes("break")) {
+    return "Reconciliation";
+  }
+
+  if (name.includes("settlement") || name.includes("exception")) {
+    return "Settlement";
+  }
+
+  if (name.includes("custody") || name.includes("account")) {
+    return "Custody";
+  }
+
+  if (name.includes("sla")) {
+    return "SLA";
+  }
+
+  if (name.includes("policy")) {
+    return "Policy";
+  }
+
+  if (name.includes("case")) {
+    return "Case Management";
+  }
+
+  return "Operations";
 }
