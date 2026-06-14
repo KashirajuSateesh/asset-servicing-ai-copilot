@@ -2,7 +2,6 @@
 
 import {
   AlertTriangle,
-  BarChart3,
   Bot,
   BriefcaseBusiness,
   Database,
@@ -2577,35 +2576,6 @@ function TrendBar({
   );
 }
 
-function RiskItem({
-  queue,
-  risk,
-  count,
-}: {
-  queue: string;
-  risk: string;
-  count: string;
-}) {
-  const riskClass =
-    risk === "High"
-      ? "bg-red-100 text-red-700"
-      : risk === "Medium"
-      ? "bg-orange-100 text-orange-700"
-      : "bg-green-100 text-green-700";
-
-  return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-      <div>
-        <p className="text-sm font-semibold">{queue}</p>
-        <p className="text-xs text-slate-500">{count} items at risk</p>
-      </div>
-
-      <span className={`rounded-full px-2 py-1 text-xs font-bold ${riskClass}`}>
-        {risk}
-      </span>
-    </div>
-  );
-}
 
 function calculatePercent(value: number, total: number) {
   if (!total || total <= 0) {
