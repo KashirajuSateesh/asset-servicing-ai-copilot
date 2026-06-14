@@ -980,11 +980,297 @@ function DocumentsPage() {
 }
 
 function ExceptionsPage() {
+  const [exceptionId, setExceptionId] = useState("EXC-000001");
+  const [exceptionContext, setExceptionContext] = useState<any | null>(null);
+  const [guidanceResult, setGuidanceResult] = useState<any | null>(null);
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [loadingGuidance, setLoadingGuidance] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function loadExceptionContext() {
+    setLoadingContext(true);
+    setError("");
+    setGuidanceResult(null);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/operations/context/${exceptionId}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Exception lookup error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setExceptionContext(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load exception details."
+      );
+    } finally {
+      setLoadingContext(false);
+    }
+  }
+
+  async function getAiGuidance() {
+    setLoadingGuidance(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/operations/guidance/${exceptionId}?top_k=8`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Guidance error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setGuidanceResult(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate AI guidance."
+      );
+    } finally {
+      setLoadingGuidance(false);
+    }
+  }
+
+  const recordData = exceptionContext?.record_data || {};
+  const guidance = guidanceResult?.policy_guidance || {};
+
   return (
-    <PlaceholderPage
-      title="Exceptions"
-      description="Settlement exceptions list, exception detail, AI insights, SLA risk, and recommended actions."
-    />
+    <div className="space-y-8">
+      <PageHeader
+        title="Settlement Exceptions"
+        description="Search exception records, review operational context, and generate AI-guided next actions."
+      />
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Exception Lookup</h2>
+            <p className="text-sm text-slate-500">
+              Search settlement exception records from Azure SQL.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-xl">
+            <input
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+              value={exceptionId}
+              placeholder="Example: EXC-000001"
+              onChange={(event) => setExceptionId(event.target.value)}
+            />
+
+            <button
+              onClick={loadExceptionContext}
+              disabled={loadingContext || !exceptionId.trim()}
+              className="rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+            >
+              {loadingContext ? "Loading..." : "Load Exception"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            title="Open Exceptions"
+            value="140"
+            change="SQL"
+            tone="warning"
+          />
+          <KpiCard
+            title="High Exposure"
+            value="$3.7M"
+            change="Selected"
+            tone="danger"
+          />
+          <KpiCard
+            title="Current Status"
+            value={recordData.exception_status || "-"}
+            change="Live"
+            tone="info"
+          />
+          <KpiCard
+            title="AI Guidance"
+            value={guidanceResult ? "Ready" : "Pending"}
+            change={guidanceResult ? "Generated" : "Not Run"}
+            tone={guidanceResult ? "success" : "warning"}
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold">Exception Details</h2>
+          <p className="text-sm text-slate-500">
+            Operational context retrieved from structured SQL records.
+          </p>
+
+          {!exceptionContext && (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Load an exception to view details.
+            </div>
+          )}
+
+          {exceptionContext && (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-bold uppercase text-blue-600">
+                  Context Summary
+                </p>
+                <p className="mt-2 text-sm font-semibold text-blue-950">
+                  {exceptionContext.context_summary}
+                </p>
+              </div>
+
+              <div className="grid gap-3 text-sm">
+                <InfoRow
+                  label="Exception ID"
+                  value={recordData.exception_id || exceptionId}
+                />
+                <InfoRow label="Trade ID" value={recordData.trade_id || "-"} />
+                <InfoRow
+                  label="Account ID"
+                  value={recordData.account_id || "-"}
+                />
+                <InfoRow
+                  label="Reason"
+                  value={recordData.exception_reason || "-"}
+                />
+                <InfoRow label="Severity" value={recordData.severity || "-"} />
+                <InfoRow
+                  label="Status"
+                  value={recordData.exception_status || "-"}
+                />
+                <InfoRow
+                  label="Assigned Team"
+                  value={recordData.assigned_team || "-"}
+                />
+                <InfoRow
+                  label="SLA Due Date"
+                  value={recordData.sla_due_date || "-"}
+                />
+                <InfoRow
+                  label="Exposure USD"
+                  value={
+                    recordData.estimated_exposure_usd
+                      ? `$${Number(
+                          recordData.estimated_exposure_usd
+                        ).toLocaleString()}`
+                      : "-"
+                  }
+                />
+              </div>
+
+              <button
+                onClick={getAiGuidance}
+                disabled={loadingGuidance}
+                className="mt-3 w-full rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+              >
+                {loadingGuidance ? "Generating..." : "Get AI Guidance"}
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold">AI Recommendation</h2>
+          <p className="text-sm text-slate-500">
+            Combines SQL context with settlement policy documents.
+          </p>
+
+          {!guidanceResult && (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Load an exception and click Get AI Guidance.
+            </div>
+          )}
+
+          {guidanceResult && (
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-bold">Recommended Next Action</h3>
+
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                  {guidance.confidence_label || "unknown"}
+                </span>
+              </div>
+
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {guidance.answer}
+              </p>
+
+              <div className="mt-5 grid gap-3 text-sm">
+                <InfoRow
+                  label="Business Domain"
+                  value={guidanceResult.business_domain || "-"}
+                />
+                <InfoRow
+                  label="Confidence"
+                  value={
+                    guidance.confidence_score !== undefined
+                      ? `${guidance.confidence_score} (${guidance.confidence_label})`
+                      : "-"
+                  }
+                />
+                <InfoRow
+                  label="Human Review"
+                  value={String(guidance.human_review_required ?? "-")}
+                />
+                <InfoRow
+                  label="Record Type"
+                  value={guidanceResult.record_type || "-"}
+                />
+              </div>
+
+              {guidance.citations?.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-bold">Policy Citations</h4>
+
+                  <div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto pr-2">
+                    {guidance.citations.map((citation: Citation) => (
+                      <div
+                        key={`${citation.document_name}-${citation.chunk_index}-${citation.source_number}`}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-bold text-slate-800">
+                            Source {citation.source_number}:{" "}
+                            {citation.document_name}
+                          </p>
+
+                          <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                            Page {citation.page_number}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-slate-500">
+                          Domain: {citation.business_domain} • Chunk:{" "}
+                          {citation.chunk_index} • Score:{" "}
+                          {citation.score?.toFixed
+                            ? citation.score.toFixed(4)
+                            : citation.score}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
