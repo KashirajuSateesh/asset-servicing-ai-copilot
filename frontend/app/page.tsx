@@ -15,6 +15,8 @@ import {
   Settings,
   ShieldCheck,
   Shuffle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -143,11 +145,17 @@ const navigationItems: NavigationItem[] = [
 
 export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <main className="h-screen overflow-hidden bg-slate-100 text-slate-950">
       <div className="flex h-screen overflow-hidden">
-        <Sidebar activePage={activePage} setActivePage={setActivePage} />
+        <Sidebar
+          activePage={activePage}
+          setActivePage={setActivePage}
+          collapsed={sidebarCollapsed}
+          setCollapsed={setSidebarCollapsed}
+        />
 
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar />
@@ -171,24 +179,48 @@ export default function Home() {
 function Sidebar({
   activePage,
   setActivePage,
+  collapsed,
+  setCollapsed,
 }: {
   activePage: PageKey;
   setActivePage: (page: PageKey) => void;
+  collapsed: boolean;
+  setCollapsed: (value: boolean) => void;
 }) {
   return (
-    <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col overflow-hidden bg-[#061a3a] text-white">
-      <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300">
-          <Bot className="h-6 w-6" />
+    <aside
+      className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden bg-[#061a3a] text-white transition-all duration-300 ${
+        collapsed ? "w-24" : "w-72"
+      }`}
+    >
+      <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 px-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-300">
+            <Bot className="h-6 w-6" />
+          </div>
+
+          {!collapsed && (
+            <div>
+              <h1 className="text-lg font-bold">Asset Servicing</h1>
+              <p className="text-xs text-slate-300">AI Copilot</p>
+            </div>
+          )}
         </div>
 
-        <div>
-          <h1 className="text-lg font-bold">Asset Servicing</h1>
-          <p className="text-xs text-slate-300">AI Copilot</p>
-        </div>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="rounded-xl p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" />
+          )}
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-6">
+      <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navigationItems.map((item) => {
           const isActive = activePage === item.key;
 
@@ -196,28 +228,32 @@ function Sidebar({
             <button
               key={item.key}
               onClick={() => setActivePage(item.key)}
-              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+              className={`flex w-full items-center rounded-2xl py-3 text-sm font-semibold transition ${
+                collapsed ? "justify-center px-0" : "gap-3 px-4 text-left"
+              } ${
                 isActive
                   ? "bg-cyan-500/25 text-white shadow"
                   : "text-slate-300 hover:bg-white/10 hover:text-white"
               }`}
             >
               {item.icon}
-              {item.label}
+              {!collapsed && item.label}
             </button>
           );
         })}
       </nav>
 
       <div className="shrink-0 border-t border-white/10 p-5 text-xs text-slate-300">
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
           <RefreshCcw className="h-4 w-4" />
-          <span>Data refreshed from live services</span>
+          {!collapsed && <span>Data refreshed from live services</span>}
         </div>
 
-        <p className="mt-3 text-slate-400">
-          Azure SQL • AI Search • Cosmos DB
-        </p>
+        {!collapsed && (
+          <p className="mt-3 text-slate-400">
+            Azure SQL • AI Search • Cosmos DB
+          </p>
+        )}
       </div>
     </aside>
   );
@@ -687,11 +723,259 @@ function CopilotPage() {
 }
 
 function DocumentsPage() {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [documentSearch, setDocumentSearch] = useState("");
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function fetchDocuments() {
+    setLoadingDocs(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/documents/blobs/raw-pdfs`);
+
+      if (!response.ok) {
+        throw new Error(`Documents fetch error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setDocuments(data.blobs || data.documents || data || []);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch documents."
+      );
+    } finally {
+      setLoadingDocs(false);
+    }
+  }
+
+  function getDocumentName(doc: any, index: number) {
+    if (typeof doc === "string") {
+      return doc;
+    }
+
+    return (
+      doc.name ||
+      doc.blob_name ||
+      doc.source_blob_name ||
+      doc.filename ||
+      `Document ${index + 1}`
+    );
+  }
+
+  function detectDocumentDomain(documentName: string) {
+    const lowerName = documentName.toLowerCase();
+
+    if (lowerName.includes("settlement")) {
+      return "Settlement";
+    }
+
+    if (lowerName.includes("reconciliation")) {
+      return "Reconciliation";
+    }
+
+    if (lowerName.includes("custody")) {
+      return "Custody";
+    }
+
+    if (lowerName.includes("corporate")) {
+      return "Corporate Actions";
+    }
+
+    if (lowerName.includes("sla")) {
+      return "SLA / Escalation";
+    }
+
+    return "General Policy";
+  }
+
+  const filteredDocuments = documents.filter((doc, index) => {
+    const name = getDocumentName(doc, index);
+    const domain = detectDocumentDomain(name);
+
+    const search = documentSearch.toLowerCase();
+
+    return (
+      name.toLowerCase().includes(search) ||
+      domain.toLowerCase().includes(search)
+    );
+  });
+
   return (
-    <PlaceholderPage
-      title="Documents"
-      description="Policy PDFs, SOPs, SLA documents, indexing status, and document search will live here."
-    />
+    <div className="space-y-8">
+      <PageHeader
+        title="Documents"
+        description="View uploaded policy documents, search the knowledge base inventory, and verify indexing readiness."
+      />
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Knowledge Base Overview</h2>
+            <p className="text-sm text-slate-500">
+              Documents uploaded to Azure Blob Storage and indexed into Azure AI Search.
+            </p>
+          </div>
+
+          <button
+            onClick={fetchDocuments}
+            disabled={loadingDocs}
+            className="w-fit rounded-2xl bg-[#061a3a] px-4 py-2 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+          >
+            {loadingDocs ? "Loading..." : "Load Documents"}
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            title="Uploaded PDFs"
+            value={documents.length > 0 ? String(documents.length) : "25"
+            }
+            change="Blob"
+            tone="success"
+          />
+          <KpiCard title="Indexed Chunks" value="75" change="Search" tone="info" />
+          <KpiCard title="Retrieval Mode" value="Hybrid" change="Active" tone="success" />
+          <KpiCard title="Embedding Model" value="OpenAI" change="1536 dim" tone="info" />
+        </div>
+      </section>
+
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Document Library</h2>
+            <p className="text-sm text-slate-500">
+              Search documents by name or domain. Policy answering is handled in Ask Copilot.
+            </p>
+          </div>
+
+          <div className="w-full lg:max-w-md">
+            <label className="text-sm font-semibold">Search Documents</label>
+            <input
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+              value={documentSearch}
+              placeholder="Search settlement, reconciliation, custody, SLA..."
+              onChange={(event) => setDocumentSearch(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 max-h-[560px] overflow-auto rounded-2xl border border-slate-200">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Document Name</th>
+                <th className="px-4 py-3">Domain</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Index Status</th>
+                <th className="px-4 py-3">RAG Ready</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-200">
+              {documents.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-slate-500"
+                  >
+                    Click Load Documents to fetch uploaded PDFs from Azure Blob.
+                  </td>
+                </tr>
+              )}
+
+              {documents.length > 0 && filteredDocuments.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-slate-500"
+                  >
+                    No documents match your search.
+                  </td>
+                </tr>
+              )}
+
+              {filteredDocuments.map((doc, index) => {
+                const name = getDocumentName(doc, index);
+                const domain = detectDocumentDomain(name);
+
+                return (
+                  <tr key={`${name}-${index}`}>
+                    <td className="max-w-[420px] px-4 py-4 font-semibold">
+                      <span className="line-clamp-2 break-words">{name}</span>
+                    </td>
+
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+                        {domain}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-4 text-slate-600">
+                      Azure Blob / raw-pdfs
+                    </td>
+
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
+                        Indexed
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-4">
+                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
+                        Ready
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-3 text-xs text-slate-500">
+          This page is for document inventory and governance. Business users ask policy questions from the Ask Copilot page.
+        </p>
+      </section>
+
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold">Document Governance Notes</h2>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <GovernanceCard
+            title="Blob Storage Source"
+            status="Active"
+            description="Raw policy PDFs are stored in Azure Blob container raw-pdfs."
+          />
+          <GovernanceCard
+            title="OCR / Parsing"
+            status="Complete"
+            description="PDF text is extracted and converted into searchable chunks."
+          />
+          <GovernanceCard
+            title="Metadata Tagging"
+            status="Active"
+            description="Documents are tagged by domain such as settlement, custody, and reconciliation."
+          />
+          <GovernanceCard
+            title="Vector Index"
+            status="Ready"
+            description="Chunks are embedded and available through Azure AI Search hybrid retrieval."
+          />
+        </div>
+      </section>
+    </div>
   );
 }
 
