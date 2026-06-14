@@ -160,7 +160,7 @@ export default function Home() {
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar />
 
-          <section className="flex-1 overflow-y-auto p-8">
+          <section className="flex-1 overflow-y-auto p-5 lg:p-6">
             {activePage === "dashboard" && <DashboardPage />}
             {activePage === "copilot" && <CopilotPage />}
             {activePage === "documents" && <DocumentsPage />}
@@ -326,7 +326,7 @@ function DashboardPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-lg font-bold">Exceptions & Breaks Trend</h2>
 
           <div className="mt-5 flex h-72 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
@@ -334,7 +334,7 @@ function DashboardPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-lg font-bold">What this project does</h2>
 
           <div className="mt-5 space-y-5">
@@ -362,18 +362,18 @@ function DashboardPage() {
         </section>
       </div>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-lg font-bold">Priority Queues</h2>
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-4 py-3">Queue</th>
-                <th className="px-4 py-3">Open Items</th>
-                <th className="px-4 py-3">SLA Risk</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Owner</th>
+                <th className="px-3 py-2">Queue</th>
+                <th className="px-3 py-2">Open Items</th>
+                <th className="px-3 py-2">SLA Risk</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Owner</th>
               </tr>
             </thead>
 
@@ -503,7 +503,7 @@ function CopilotPage() {
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">Copilot Chat</h2>
@@ -627,7 +627,7 @@ function CopilotPage() {
         </section>
 
         <aside className="space-y-6">
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
             <h2 className="text-lg font-bold">Route & Memory</h2>
 
             <div className="mt-4 space-y-3 text-sm">
@@ -657,7 +657,7 @@ function CopilotPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <section className="rounded-2xl bg-white p-5 shadow-sm">
             <h2 className="text-lg font-bold">Security & Observability</h2>
 
             <div className="mt-4 grid gap-3 text-sm">
@@ -819,7 +819,7 @@ function DocumentsPage() {
         </div>
       )}
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-bold">Knowledge Base Overview</h2>
@@ -851,7 +851,7 @@ function DocumentsPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-xl font-bold">Document Library</h2>
@@ -875,11 +875,11 @@ function DocumentsPage() {
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-4 py-3">Document Name</th>
-                <th className="px-4 py-3">Domain</th>
-                <th className="px-4 py-3">Source</th>
-                <th className="px-4 py-3">Index Status</th>
-                <th className="px-4 py-3">RAG Ready</th>
+                <th className="px-3 py-2">Document Name</th>
+                <th className="px-3 py-2">Domain</th>
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Index Status</th>
+                <th className="px-3 py-2">RAG Ready</th>
               </tr>
             </thead>
 
@@ -916,7 +916,7 @@ function DocumentsPage() {
                       <span className="line-clamp-2 break-words">{name}</span>
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-3 py-3">
                       <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
                         {domain}
                       </span>
@@ -926,13 +926,13 @@ function DocumentsPage() {
                       Azure Blob / raw-pdfs
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-3 py-3">
                       <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
                         Indexed
                       </span>
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-3 py-3">
                       <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
                         Ready
                       </span>
@@ -949,7 +949,7 @@ function DocumentsPage() {
         </p>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-xl font-bold">Document Governance Notes</h2>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1055,7 +1055,7 @@ function ExceptionsPage() {
         </div>
       )}
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-xl font-bold">Exception Lookup</h2>
@@ -1111,7 +1111,7 @@ function ExceptionsPage() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold">Exception Details</h2>
           <p className="text-sm text-slate-500">
             Operational context retrieved from structured SQL records.
@@ -1184,7 +1184,7 @@ function ExceptionsPage() {
           )}
         </section>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold">AI Recommendation</h2>
           <p className="text-sm text-slate-500">
             Combines SQL context with settlement policy documents.
@@ -1275,11 +1275,309 @@ function ExceptionsPage() {
 }
 
 function ReconciliationPage() {
+  const [breakId, setBreakId] = useState("BRK-0000001");
+  const [breakContext, setBreakContext] = useState<any | null>(null);
+  const [guidanceResult, setGuidanceResult] = useState<any | null>(null);
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [loadingGuidance, setLoadingGuidance] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function loadBreakContext() {
+    setLoadingContext(true);
+    setError("");
+    setGuidanceResult(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/operations/context/${breakId}`);
+
+      if (!response.ok) {
+        throw new Error(`Reconciliation break lookup error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setBreakContext(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load reconciliation break details."
+      );
+    } finally {
+      setLoadingContext(false);
+    }
+  }
+
+  async function getAiGuidance() {
+    setLoadingGuidance(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/operations/guidance/${breakId}?top_k=8`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Guidance error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setGuidanceResult(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate AI guidance."
+      );
+    } finally {
+      setLoadingGuidance(false);
+    }
+  }
+
+  const recordData = breakContext?.record_data || {};
+  const guidance = guidanceResult?.policy_guidance || {};
+
   return (
-    <PlaceholderPage
-      title="Reconciliation Breaks"
-      description="Breaks table, AI match suggestions, aging, and resolution actions."
-    />
+    <div className="space-y-8">
+      <PageHeader
+        title="Reconciliation Breaks"
+        description="Review reconciliation breaks, inspect SQL context, and generate AI-guided resolution recommendations."
+      />
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Break Lookup</h2>
+            <p className="text-sm text-slate-500">
+              Search reconciliation break records from Azure SQL.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-xl">
+            <input
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-cyan-500"
+              value={breakId}
+              placeholder="Example: BRK-0000001"
+              onChange={(event) => setBreakId(event.target.value)}
+            />
+
+            <button
+              onClick={loadBreakContext}
+              disabled={loadingContext || !breakId.trim()}
+              className="rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+            >
+              {loadingContext ? "Loading..." : "Load Break"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            title="Open Breaks"
+            value="400"
+            change="SQL"
+            tone="warning"
+          />
+          <KpiCard
+            title="Selected Break"
+            value={recordData.break_id || breakId}
+            change="Live"
+            tone="info"
+          />
+          <KpiCard
+            title="Break Status"
+            value={recordData.break_status || recordData.status || "-"}
+            change="Current"
+            tone="warning"
+          />
+          <KpiCard
+            title="AI Guidance"
+            value={guidanceResult ? "Ready" : "Pending"}
+            change={guidanceResult ? "Generated" : "Not Run"}
+            tone={guidanceResult ? "success" : "warning"}
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold">Break Details</h2>
+          <p className="text-sm text-slate-500">
+            Operational context retrieved from structured reconciliation records.
+          </p>
+
+          {!breakContext && (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Load a reconciliation break to view details.
+            </div>
+          )}
+
+          {breakContext && (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-bold uppercase text-blue-600">
+                  Context Summary
+                </p>
+                <p className="mt-2 text-sm font-semibold text-blue-950">
+                  {breakContext.context_summary}
+                </p>
+              </div>
+
+              <div className="grid gap-3 text-sm">
+                <InfoRow
+                  label="Break ID"
+                  value={recordData.break_id || breakId}
+                />
+                <InfoRow
+                  label="Account ID"
+                  value={recordData.account_id || "-"}
+                />
+                <InfoRow
+                  label="Trade ID"
+                  value={recordData.trade_id || "-"}
+                />
+                <InfoRow
+                  label="Break Type"
+                  value={recordData.break_type || recordData.recon_type || "-"}
+                />
+                <InfoRow
+                  label="Source System"
+                  value={recordData.source_system || "-"}
+                />
+                <InfoRow
+                  label="Status"
+                  value={recordData.break_status || recordData.status || "-"}
+                />
+                <InfoRow
+                  label="Assigned Team"
+                  value={recordData.assigned_team || "-"}
+                />
+                <InfoRow
+                  label="Detected Date"
+                  value={recordData.detected_date || "-"}
+                />
+                <InfoRow
+                  label="Aging Days"
+                  value={String(recordData.aging_days ?? "-")}
+                />
+                <InfoRow
+                  label="Amount Difference"
+                  value={
+                    recordData.amount_difference_usd
+                      ? `$${Number(
+                          recordData.amount_difference_usd
+                        ).toLocaleString()}`
+                      : recordData.difference_amount
+                      ? `$${Number(recordData.difference_amount).toLocaleString()}`
+                      : "-"
+                  }
+                />
+              </div>
+
+              <button
+                onClick={getAiGuidance}
+                disabled={loadingGuidance}
+                className="mt-3 w-full rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+              >
+                {loadingGuidance ? "Generating..." : "Get AI Guidance"}
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-bold">AI Resolution Recommendation</h2>
+          <p className="text-sm text-slate-500">
+            Combines reconciliation break context with policy and SOP documents.
+          </p>
+
+          {!guidanceResult && (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+              Load a break and click Get AI Guidance.
+            </div>
+          )}
+
+          {guidanceResult && (
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-bold">Recommended Resolution</h3>
+
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                  {guidance.confidence_label || "unknown"}
+                </span>
+              </div>
+
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {guidance.answer}
+              </p>
+
+              <div className="mt-5 grid gap-3 text-sm">
+                <InfoRow
+                  label="Business Domain"
+                  value={guidanceResult.business_domain || "-"}
+                />
+                <InfoRow
+                  label="Confidence"
+                  value={
+                    guidance.confidence_score !== undefined
+                      ? `${guidance.confidence_score} (${guidance.confidence_label})`
+                      : "-"
+                  }
+                />
+                <InfoRow
+                  label="Human Review"
+                  value={String(guidance.human_review_required ?? "-")}
+                />
+                <InfoRow
+                  label="Record Type"
+                  value={guidanceResult.record_type || "-"}
+                />
+              </div>
+
+              {guidance.citations?.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-bold">Policy Citations</h4>
+
+                  <div className="mt-3 max-h-[360px] space-y-3 overflow-y-auto pr-2">
+                    {guidance.citations.map((citation: Citation) => (
+                      <div
+                        key={`${citation.document_name}-${citation.chunk_index}-${citation.source_number}`}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-bold text-slate-800">
+                            Source {citation.source_number}:{" "}
+                            {citation.document_name}
+                          </p>
+
+                          <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-600">
+                            Page {citation.page_number}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-slate-500">
+                          Domain: {citation.business_domain} • Chunk:{" "}
+                          {citation.chunk_index} • Score:{" "}
+                          {citation.score?.toFixed
+                            ? citation.score.toFixed(4)
+                            : citation.score}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -1375,7 +1673,7 @@ function AdminPage() {
       )}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold">System Health</h2>
@@ -1446,7 +1744,7 @@ function AdminPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-xl font-bold">Security & Governance</h2>
           <p className="text-sm text-slate-500">
             Demo controls implemented for enterprise readiness.
@@ -1487,7 +1785,7 @@ function AdminPage() {
         </section>
       </div>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-xl font-bold">Audit Event Explorer</h2>
@@ -1518,12 +1816,12 @@ function AdminPage() {
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-4 py-3">Time</th>
-                <th className="px-4 py-3">Request ID</th>
-                <th className="px-4 py-3">Route</th>
-                <th className="px-4 py-3">Record ID</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Confidence</th>
+                <th className="px-3 py-2">Time</th>
+                <th className="px-3 py-2">Request ID</th>
+                <th className="px-3 py-2">Route</th>
+                <th className="px-3 py-2">Record ID</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Confidence</th>
               </tr>
             </thead>
 
@@ -1551,9 +1849,9 @@ function AdminPage() {
                       {event.request_id || "-"}
                     </span>
                   </td>
-                  <td className="px-4 py-4">{event.route || "-"}</td>
-                  <td className="px-4 py-4">{event.record_id || "-"}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-3">{event.route || "-"}</td>
+                  <td className="px-3 py-3">{event.record_id || "-"}</td>
+                  <td className="px-3 py-3">
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-bold ${
                         event.status === "success"
@@ -1564,7 +1862,7 @@ function AdminPage() {
                       {event.status || "-"}
                     </span>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-3">
                     {event.confidence_score !== null
                       ? `${event.confidence_score} (${event.confidence_label})`
                       : "-"}
@@ -1616,11 +1914,11 @@ function PageHeader({
 }) {
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight text-slate-950">
+      <h1 className="text-2xl font-bold tracking-tight text-slate-950">
         {title}
       </h1>
 
-      <p className="mt-2 text-sm text-slate-600">{description}</p>
+      <p className="mt-1 text-sm text-slate-600">{description}</p>
     </div>
   );
 }
@@ -1646,14 +1944,18 @@ function KpiCard({
       : "bg-blue-50 text-blue-700";
 
   return (
-    <section className="rounded-3xl bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold text-slate-600">{title}</p>
+    <section className="rounded-2xl bg-white p-4 shadow-sm">
+      <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </p>
 
-      <div className="mt-4 flex items-end justify-between">
-        <p className="text-3xl font-bold">{value}</p>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <p className="truncate text-2xl font-bold leading-none text-slate-950">
+          {value}
+        </p>
 
         <span
-          className={`rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}
+          className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${toneClass}`}
         >
           {change}
         </span>
@@ -1703,18 +2005,18 @@ function QueueRow({
       <td className="px-4 py-4 font-semibold">{queue}</td>
       <td className="px-4 py-4 text-blue-700">{items}</td>
       <td className="px-4 py-4 text-red-600">{risk}</td>
-      <td className="px-4 py-4">{status}</td>
-      <td className="px-4 py-4">{owner}</td>
+      <td className="px-3 py-3">{status}</td>
+      <td className="px-3 py-3">{owner}</td>
     </tr>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-      <span className="text-slate-500">{label}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
 
-      <span className="max-w-[220px] truncate text-right font-semibold text-slate-900">
+      <span className="max-w-[220px] truncate text-right text-xs font-semibold text-slate-900">
         {value}
       </span>
     </div>
@@ -1723,10 +2025,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function StatusItem({ label, status }: { label: string; status: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
-      <span>{label}</span>
+    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+      <span className="text-xs font-medium text-slate-600">{label}</span>
 
-      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+      <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-bold text-blue-700">
         {status}
       </span>
     </div>
@@ -1752,16 +2054,16 @@ function HealthRow({
       : "bg-red-100 text-red-700";
 
   return (
-    <div className="rounded-2xl border border-slate-200 p-4">
+    <div className="rounded-xl border border-slate-200 p-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold">{label}</p>
+        <p className="text-sm font-semibold">{label}</p>
         <span
-          className={`rounded-full px-2 py-1 text-xs font-bold capitalize ${statusClass}`}
+          className={`rounded-full px-2 py-1 text-[11px] font-bold capitalize ${statusClass}`}
         >
           {status}
         </span>
       </div>
-      <p className="mt-2 line-clamp-3 text-xs text-slate-500">{message}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-slate-500">{message}</p>
     </div>
   );
 }
@@ -1776,14 +2078,14 @@ function GovernanceCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold">{title}</p>
-        <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+        <p className="text-sm font-semibold">{title}</p>
+        <span className="rounded-full bg-blue-100 px-2 py-1 text-[11px] font-bold text-blue-700">
           {status}
         </span>
       </div>
-      <p className="mt-2 line-clamp-3 text-sm text-slate-500">{description}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p>
     </div>
   );
 }
