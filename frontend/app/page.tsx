@@ -333,7 +333,9 @@ function DashboardPage() {
       }
 
       const data = await response.json();
+
       setAnalytics(data);
+      sessionStorage.setItem("dashboardAnalytics", JSON.stringify(data));
       sessionStorage.setItem("dashboardAnalytics", JSON.stringify(data));
     } catch (err) {
       setError(
@@ -348,8 +350,13 @@ function DashboardPage() {
     const cachedData = sessionStorage.getItem("dashboardAnalytics");
 
     if (cachedData) {
-      setAnalytics(JSON.parse(cachedData));
-      return;
+      try {
+        const parsedData = JSON.parse(cachedData);
+        setAnalytics(parsedData);
+        return;
+      } catch {
+        sessionStorage.removeItem("dashboardAnalytics");
+      }
     }
 
     fetchDashboardData();
