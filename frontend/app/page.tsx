@@ -100,6 +100,35 @@ type SystemHealthResponse = {
   };
 };
 
+type AnalyticsSummaryResponse = {
+  operations: {
+    settlement_exceptions: number;
+    reconciliation_breaks: number;
+    case_tickets: number;
+    corporate_actions: number;
+    trade_status: number;
+    custody_accounts: number;
+  };
+  ai_usage: {
+    total_requests: number;
+    successful_requests: number;
+    failed_requests: number;
+    human_review_required: number;
+    average_confidence: number | null;
+    route_counts: Record<string, number>;
+  };
+  retrieval: {
+    uploaded_pdfs: number;
+    indexed_chunks: number;
+    retrieval_mode: string;
+    embedding_model: string;
+  };
+  summary: {
+    total_operational_records: number;
+    system_readiness: string;
+  };
+};
+
 const navigationItems: NavigationItem[] = [
   {
     key: "dashboard",
@@ -1869,81 +1898,262 @@ function CasesPage() {
 }
 
 function AnalyticsPage() {
+  const [analytics, setAnalytics] = useState<AnalyticsSummaryResponse | null>(
+    null
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function fetchAnalytics() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/analytics/summary`);
+
+      if (!response.ok) {
+        throw new Error(`Analytics API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAnalytics(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load analytics."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const operations = analytics?.operations;
+  const aiUsage = analytics?.ai_usage;
+  const retrieval = analytics?.retrieval;
+  const summary = analytics?.summary;
+
+  const successRate =
+    aiUsage && aiUsage.total_requests > 0
+      ? Math.round((aiUsage.successful_requests / aiUsage.total_requests) * 100)
+      : 0;
+
+  const failedRate =
+    aiUsage && aiUsage.total_requests > 0
+      ? Math.round((aiUsage.failed_requests / aiUsage.total_requests) * 100)
+      : 0;
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Analytics"
-        description="Monitor operational performance, SLA risk, exception volume, and AI copilot impact."
-      />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <PageHeader
+          title="Analytics"
+          description="Monitor operational data volume, AI usage, retrieval readiness, and governance metrics from backend services."
+        />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="AI Requests" value="1,284" change="+18%" tone="success" />
-        <KpiCard title="Avg Confidence" value="92%" change="High" tone="success" />
-        <KpiCard title="Human Review" value="38" change="-12%" tone="warning" />
-        <KpiCard title="Time Saved" value="312 hrs" change="+24%" tone="success" />
+        <button
+          onClick={fetchAnalytics}
+          disabled={loading}
+          className="w-fit rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+        >
+          {loading ? "Loading..." : "Refresh Analytics"}
+        </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">Operational Volume Trend</h2>
-          <p className="text-sm text-slate-500">
-            Weekly trend across exceptions, reconciliation breaks, and cases.
-          </p>
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
-          <div className="mt-5 grid gap-3">
-            <TrendBar label="Settlement Exceptions" value="78%" count="1,248" tone="warning" />
-            <TrendBar label="Reconciliation Breaks" value="56%" count="762" tone="info" />
-            <TrendBar label="Cases" value="42%" count="290" tone="success" />
-            <TrendBar label="Corporate Actions" value="31%" count="125" tone="info" />
+      {!analytics && (
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+            Click Refresh Analytics to load real metrics from Azure SQL, Cosmos
+            audit logs, and retrieval/indexing summary.
           </div>
         </section>
+      )}
 
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">SLA Risk Summary</h2>
-          <p className="text-sm text-slate-500">
-            Current operational queues ranked by SLA exposure.
-          </p>
-
-          <div className="mt-5 space-y-3">
-            <RiskItem queue="Settlement Exceptions" risk="High" count="126" />
-            <RiskItem queue="Reconciliation Breaks" risk="Medium" count="72" />
-            <RiskItem queue="Cases" risk="Medium" count="31" />
-            <RiskItem queue="Corporate Actions" risk="Low" count="18" />
+      {analytics && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="Operational Records"
+              value={String(summary?.total_operational_records ?? "-")}
+              change={summary?.system_readiness || "status"}
+              tone="success"
+            />
+            <KpiCard
+              title="AI Requests"
+              value={String(aiUsage?.total_requests ?? "-")}
+              change={`${successRate}% success`}
+              tone="success"
+            />
+            <KpiCard
+              title="Avg Confidence"
+              value={
+                aiUsage?.average_confidence !== null &&
+                aiUsage?.average_confidence !== undefined
+                  ? `${Math.round(aiUsage.average_confidence * 100)}%`
+                  : "-"
+              }
+              change="Cosmos"
+              tone="success"
+            />
+            <KpiCard
+              title="Indexed Chunks"
+              value={String(retrieval?.indexed_chunks ?? "-")}
+              change={retrieval?.retrieval_mode || "-"}
+              tone="info"
+            />
           </div>
-        </section>
-      </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">Copilot Impact</h2>
-          <div className="mt-5 space-y-3">
-            <InfoRow label="Manual lookup reduction" value="40%" />
-            <InfoRow label="Avg answer time" value="6 sec" />
-            <InfoRow label="Citation coverage" value="96%" />
-            <InfoRow label="Escalation accuracy" value="High" />
-          </div>
-        </section>
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Operational Data Volume</h2>
+              <p className="text-sm text-slate-500">
+                Real row counts from Azure SQL operational tables.
+              </p>
 
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">Retrieval Quality</h2>
-          <div className="mt-5 space-y-3">
-            <InfoRow label="Hybrid retrieval" value="Active" />
-            <InfoRow label="Indexed chunks" value="75" />
-            <InfoRow label="Domains covered" value="5" />
-            <InfoRow label="Low-confidence answers" value="38" />
-          </div>
-        </section>
+              <div className="mt-5 grid gap-3">
+                <TrendBar
+                  label="Settlement Exceptions"
+                  value={calculatePercent(
+                    operations?.settlement_exceptions || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.settlement_exceptions ?? "-")}
+                  tone="warning"
+                />
+                <TrendBar
+                  label="Reconciliation Breaks"
+                  value={calculatePercent(
+                    operations?.reconciliation_breaks || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.reconciliation_breaks ?? "-")}
+                  tone="info"
+                />
+                <TrendBar
+                  label="Case Tickets"
+                  value={calculatePercent(
+                    operations?.case_tickets || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.case_tickets ?? "-")}
+                  tone="success"
+                />
+                <TrendBar
+                  label="Trade Status"
+                  value={calculatePercent(
+                    operations?.trade_status || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.trade_status ?? "-")}
+                  tone="info"
+                />
+                <TrendBar
+                  label="Custody Accounts"
+                  value={calculatePercent(
+                    operations?.custody_accounts || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.custody_accounts ?? "-")}
+                  tone="success"
+                />
+                <TrendBar
+                  label="Corporate Actions"
+                  value={calculatePercent(
+                    operations?.corporate_actions || 0,
+                    summary?.total_operational_records || 1
+                  )}
+                  count={String(operations?.corporate_actions ?? "-")}
+                  tone="info"
+                />
+              </div>
+            </section>
 
-        <section className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold">Governance Metrics</h2>
-          <div className="mt-5 space-y-3">
-            <InfoRow label="Audit events" value="Tracked" />
-            <InfoRow label="Request tracing" value="Active" />
-            <InfoRow label="API security" value="Active" />
-            <InfoRow label="Human review flag" value="Enabled" />
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">AI Usage Summary</h2>
+              <p className="text-sm text-slate-500">
+                Real metrics from Cosmos DB audit events.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                <RiskItem
+                  queue="Successful Requests"
+                  risk="Success"
+                  count={String(aiUsage?.successful_requests ?? "0")}
+                />
+                <RiskItem
+                  queue="Failed Requests"
+                  risk={failedRate > 10 ? "High" : "Low"}
+                  count={String(aiUsage?.failed_requests ?? "0")}
+                />
+                <RiskItem
+                  queue="Human Review Required"
+                  risk={
+                    (aiUsage?.human_review_required || 0) > 5 ? "Medium" : "Low"
+                  }
+                  count={String(aiUsage?.human_review_required ?? "0")}
+                />
+                <RiskItem
+                  queue="Total Audit Events"
+                  risk="Success"
+                  count={String(aiUsage?.total_requests ?? "0")}
+                />
+              </div>
+            </section>
           </div>
-        </section>
-      </div>
+
+          <div className="grid gap-6 xl:grid-cols-3">
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Route Usage</h2>
+              <div className="mt-5 space-y-3">
+                {Object.entries(aiUsage?.route_counts || {}).map(
+                  ([route, count]) => (
+                    <InfoRow key={route} label={route} value={String(count)} />
+                  )
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Retrieval Readiness</h2>
+              <div className="mt-5 space-y-3">
+                <InfoRow
+                  label="Uploaded PDFs"
+                  value={String(retrieval?.uploaded_pdfs ?? "-")}
+                />
+                <InfoRow
+                  label="Indexed chunks"
+                  value={String(retrieval?.indexed_chunks ?? "-")}
+                />
+                <InfoRow
+                  label="Retrieval mode"
+                  value={retrieval?.retrieval_mode || "-"}
+                />
+                <InfoRow
+                  label="Embedding model"
+                  value={retrieval?.embedding_model || "-"}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Governance Metrics</h2>
+              <div className="mt-5 space-y-3">
+                <InfoRow label="Audit events" value="Tracked" />
+                <InfoRow label="Request tracing" value="Active" />
+                <InfoRow label="API security" value="Active" />
+                <InfoRow label="Human review flag" value="Enabled" />
+              </div>
+            </section>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -2507,4 +2717,12 @@ function RiskItem({
       </span>
     </div>
   );
+}
+
+function calculatePercent(value: number, total: number) {
+  if (!total || total <= 0) {
+    return "0%";
+  }
+
+  return `${Math.max(5, Math.round((value / total) * 100))}%`;
 }
