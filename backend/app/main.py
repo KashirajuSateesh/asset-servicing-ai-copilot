@@ -52,6 +52,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://asset-servicing-ai-copilot-frontend.vercel.app",
+        "https://asset-servicing-ai-copilot-frontend-6ol0t1btw.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
