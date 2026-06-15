@@ -17,7 +17,6 @@ RUN apt-get update \
         | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && curl -fsSL https://packages.microsoft.com/config/debian/12/prod.list \
         -o /etc/apt/sources.list.d/mssql-release.list \
-    && sed -i 's#signed-by=/usr/share/keyrings/microsoft-prod.gpg#signed-by=/usr/share/keyrings/microsoft-prod.gpg#g' /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
     && apt-get clean \
@@ -26,14 +25,19 @@ RUN apt-get update \
 # Install uv.
 RUN pip install --no-cache-dir uv
 
-# Copy backend dependency files first for better Docker cache.
-COPY pyproject.toml uv.lock ./
+# Copy backend dependency files first.
+COPY backend/pyproject.toml backend/uv.lock /app/backend/
 
-# Install Python dependencies.
+WORKDIR /app/backend
+
+# Install backend Python dependencies.
 RUN uv sync --locked --no-dev
 
-# Copy backend app code.
-COPY . .
+# Copy backend code.
+COPY backend /app/backend
+
+# Copy MCP server code from root into container.
+COPY mcp_server /app/mcp_server
 
 # Render provides PORT environment variable.
 CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
