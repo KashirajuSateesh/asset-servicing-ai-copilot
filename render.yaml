@@ -1,0 +1,77 @@
+services:
+  - type: web
+    name: asset-servicing-ai-copilot-backend
+    env: python
+    rootDir: backend
+    buildCommand: "pip install uv && uv sync --locked"
+    startCommand: "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+
+      - key: BACKEND_API_BASE_URL
+        value: https://asset-servicing-ai-copilot-backend.onrender.com
+
+      - key: COPILOT_API_KEY
+        sync: false
+
+      - key: JWT_SECRET_KEY
+        sync: false
+
+      - key: JWT_ALGORITHM
+        value: HS256
+
+      - key: JWT_EXPIRE_MINUTES
+        value: 120
+
+      - key: AZURE_SQL_SERVER
+        sync: false
+
+      - key: AZURE_SQL_DATABASE
+        sync: false
+
+      - key: AZURE_SQL_USERNAME
+        sync: false
+
+      - key: AZURE_SQL_PASSWORD
+        sync: false
+
+      - key: AZURE_SQL_DRIVER
+        value: ODBC Driver 18 for SQL Server
+
+      - key: AZURE_STORAGE_CONNECTION_STRING
+        sync: false
+
+      - key: AZURE_BLOB_CONTAINER_RAW_PDFS
+        value: raw-pdfs
+
+      - key: AZURE_SEARCH_ENDPOINT
+        sync: false
+
+      - key: AZURE_SEARCH_ADMIN_KEY
+        sync: false
+
+      - key: AZURE_SEARCH_INDEX_NAME
+        value: asset-servicing-policy-index
+
+      - key: OPENAI_API_KEY
+        sync: false
+
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4o-mini
+
+      - key: COSMOS_ENDPOINT
+        sync: false
+
+      - key: COSMOS_KEY
+        sync: false
+
+      - key: COSMOS_DATABASE_NAME
+        value: asset_copilot_memory
+
+      - key: COSMOS_CONTAINER_NAME
+        value: agent_state
