@@ -324,8 +324,8 @@ function AuthPage({
 }) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("admin@demo.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -460,7 +460,7 @@ function AuthPage({
               onChange={(event) => setEmail(event.target.value)}
               required
               type="email"
-              placeholder="admin@demo.com"
+              placeholder="Enter your email"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
           </div>
@@ -472,7 +472,7 @@ function AuthPage({
               onChange={(event) => setPassword(event.target.value)}
               required
               type="password"
-              placeholder="admin123"
+              placeholder="Enter your password"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
           </div>
