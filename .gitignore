@@ -33,3 +33,10 @@ pnpm-debug.log*
 
 # Local raw data files
 data/raw/
+
+
+# Allow safe example environment files
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+!mcp_server/.env.example
