@@ -48,8 +48,6 @@ type CopilotResponse = {
   query: string;
   conversation_id?: string;
   request_id?: string | null;
-  execution_mode?: string;
-  mcp_tool_used?: string;
   route: string;
   record_id?: string | null;
   memory_used?: boolean;
@@ -277,8 +275,8 @@ export default function Home() {
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-slate-100 text-slate-950">
-      <div className="flex h-screen overflow-hidden">
+    <main className="min-h-screen bg-slate-100 text-slate-950">
+      <div className="flex min-h-screen">
         <Sidebar
           activePage={activePage}
           setActivePage={setActivePage}
@@ -287,7 +285,7 @@ export default function Home() {
           authUser={authUser}
         />
 
-        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Topbar authUser={authUser} onLogout={() => {
             setAuthToken("");
             setAuthUser(null);
@@ -298,7 +296,13 @@ export default function Home() {
             sessionStorage.removeItem("documentsInventory");
           }} />
 
-          <section className="flex-1 overflow-y-auto p-5 lg:p-6">
+          <MobileNavigation
+            activePage={activePage}
+            setActivePage={setActivePage}
+            authUser={authUser}
+          />
+
+          <section className="flex-1 overflow-y-auto p-3 pb-24 sm:p-5 lg:p-6 lg:pb-6">
             {activePage === "dashboard" && (
               <DashboardPage authToken={authToken} authUser={authUser} />
             )}
@@ -324,8 +328,8 @@ function AuthPage({
 }) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@demo.com");
+  const [password, setPassword] = useState("admin123");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -380,14 +384,14 @@ function AuthPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950">
-      <section className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
+    <main className="flex min-h-screen items-start justify-center bg-slate-100 px-3 py-6 text-slate-950 sm:items-center sm:px-4">
+      <section className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl sm:p-8">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#061a3a] text-white">
             <ShieldCheck className="h-7 w-7" />
           </div>
 
-          <h1 className="text-2xl font-bold">Asset Servicing AI Copilot</h1>
+          <h1 className="text-xl font-bold sm:text-2xl">Asset Servicing AI Copilot</h1>
           <p className="mt-2 text-sm text-slate-500">
             Login or request access to continue.
           </p>
@@ -439,7 +443,7 @@ function AuthPage({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "signup" && (
             <div>
               <label className="text-sm font-bold text-slate-700">Name</label>
@@ -460,9 +464,7 @@ function AuthPage({
               onChange={(event) => setEmail(event.target.value)}
               required
               type="email"
-              autoComplete="off"
-              name="user_email_field"
-              placeholder="Enter your email"
+              placeholder="admin@demo.com"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
           </div>
@@ -474,9 +476,7 @@ function AuthPage({
               onChange={(event) => setPassword(event.target.value)}
               required
               type="password"
-              autoComplete="new-password"
-              name="user_password_field"
-              placeholder="Enter your password"
+              placeholder="admin123"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
           </div>
@@ -521,7 +521,7 @@ function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden bg-[#061a3a] text-white transition-all duration-300 ${
+      className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden bg-[#061a3a] text-white transition-all duration-300 lg:flex ${
         collapsed ? "w-24" : "w-72"
       }`}
     >
@@ -591,6 +591,43 @@ function Sidebar({
   );
 }
 
+function MobileNavigation({
+  activePage,
+  setActivePage,
+  authUser,
+}: {
+  activePage: PageKey;
+  setActivePage: (page: PageKey) => void;
+  authUser: AuthUser;
+}) {
+  const visibleNavigationItems = navigationItems.filter((item) =>
+    userCanAccessPage(authUser, item.key)
+  );
+
+  return (
+    <nav className="sticky top-16 z-20 flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 shadow-sm lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {visibleNavigationItems.map((item) => {
+        const isActive = activePage === item.key;
+
+        return (
+          <button
+            key={item.key}
+            onClick={() => setActivePage(item.key)}
+            className={`flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold transition ${
+              isActive
+                ? "bg-[#061a3a] text-white shadow-sm"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function Topbar({
   authUser,
   onLogout,
@@ -599,19 +636,28 @@ function Topbar({
   onLogout: () => void;
 }) {
   return (
-    <header className="flex h-20 shrink-0 items-center justify-end border-b border-slate-200 bg-white px-8 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm sm:px-6 lg:h-20 lg:justify-end lg:px-8">
+      <div className="flex items-center gap-3 lg:hidden">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#061a3a] text-white">
+          <Bot className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-sm font-bold leading-tight">Asset Servicing</p>
+          <p className="text-xs text-slate-500">AI Copilot</p>
+        </div>
+      </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-3 sm:gap-5">
         <div className="hidden items-center gap-2 rounded-full bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 md:flex">
           <ShieldCheck className="h-4 w-4" />
           JWT Auth Active
         </div>
 
-        <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 md:block">
+        <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 sm:block">
           Role: {formatRole(authUser.role)}
         </div>
 
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-800">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-800 sm:h-11 sm:w-11 sm:text-base">
           {getUserInitials(authUser.name)}
         </div>
 
@@ -1054,14 +1100,14 @@ function CopilotPage() {
             <button
               onClick={askCopilot}
               disabled={loading || !query.trim()}
-              className="rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="w-full rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
             >
               {loading ? "Thinking..." : "Ask Copilot"}
             </button>
 
             <button
               onClick={() => setQuery("What should I do next?")}
-              className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-50"
+              className="w-full rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-50 sm:w-auto"
             >
               Example: Follow-up
             </button>
@@ -1070,7 +1116,7 @@ function CopilotPage() {
               onClick={() =>
                 setQuery("When should settlement exceptions be escalated?")
               }
-              className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-50"
+              className="w-full rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-50 sm:w-auto"
             >
               Example: Policy Question
             </button>
@@ -1092,24 +1138,6 @@ function CopilotPage() {
                   <p className="mt-1 text-sm font-semibold text-blue-950">
                     {lastAskedQuestion}
                   </p>
-                </div>
-              )}
-
-              {result.execution_mode && (
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
-                    Execution Mode: {result.execution_mode.toUpperCase()}
-                  </span>
-
-                  {result.mcp_tool_used && (
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
-                      MCP Tool: {result.mcp_tool_used}
-                    </span>
-                  )}
-
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                    Route: {result.route}
-                  </span>
                 </div>
               )}
 
@@ -1423,7 +1451,7 @@ function DocumentsPage() {
         </div>
 
         <div className="mt-5 max-h-[360px] overflow-auto rounded-2xl border border-slate-200">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Document Name</th>
@@ -3113,7 +3141,7 @@ function PageHeader({
 }) {
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-slate-950">
+      <h1 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
         {title}
       </h1>
 
@@ -3215,7 +3243,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
       <span className="text-xs font-medium text-slate-500">{label}</span>
 
-      <span className="max-w-[220px] truncate text-right text-xs font-semibold text-slate-900">
+      <span className="max-w-[180px] truncate text-right text-xs font-semibold text-slate-900 sm:max-w-[220px]">
         {value}
       </span>
     </div>
