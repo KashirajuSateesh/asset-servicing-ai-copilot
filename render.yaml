@@ -3,19 +3,29 @@ services:
     name: asset-servicing-ai-copilot-backend
     env: python
     rootDir: backend
+    plan: free
+
     buildCommand: "pip install uv && uv sync --locked"
     startCommand: "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
-    plan: free
+
     envVars:
+      # App
+      - key: APP_NAME
+        value: Asset Servicing AI Copilot API
+
       - key: APP_ENV
         value: production
 
+      # Backend URL used by MCP tools.
+      # After Render creates the service, update this if Render gives a different URL.
       - key: BACKEND_API_BASE_URL
         value: https://asset-servicing-ai-copilot-backend.onrender.com
 
+      # Copilot API key
       - key: COPILOT_API_KEY
         sync: false
 
+      # JWT authentication
       - key: JWT_SECRET_KEY
         sync: false
 
@@ -23,8 +33,9 @@ services:
         value: HS256
 
       - key: JWT_EXPIRE_MINUTES
-        value: 120
+        value: "120"
 
+      # Azure SQL
       - key: AZURE_SQL_SERVER
         sync: false
 
@@ -40,38 +51,36 @@ services:
       - key: AZURE_SQL_DRIVER
         value: ODBC Driver 18 for SQL Server
 
+      # Azure Blob Storage
+      - key: AZURE_STORAGE_ACCOUNT_NAME
+        sync: false
+
       - key: AZURE_STORAGE_CONNECTION_STRING
         sync: false
 
-      - key: AZURE_BLOB_CONTAINER_RAW_PDFS
-        value: raw-pdfs
-
+      # Azure AI Search
       - key: AZURE_SEARCH_ENDPOINT
         sync: false
 
-      - key: AZURE_SEARCH_ADMIN_KEY
+      - key: AZURE_SEARCH_KEY
         sync: false
 
       - key: AZURE_SEARCH_INDEX_NAME
-        value: asset-servicing-policy-index
+        value: asset-policy-chunks
 
-      - key: OPENAI_API_KEY
+      # Azure Cosmos DB
+      - key: AZURE_COSMOS_ENDPOINT
         sync: false
 
-      - key: OPENAI_EMBEDDING_MODEL
-        value: text-embedding-3-small
-
-      - key: OPENAI_CHAT_MODEL
-        value: gpt-4o-mini
-
-      - key: COSMOS_ENDPOINT
+      - key: AZURE_COSMOS_KEY
         sync: false
 
-      - key: COSMOS_KEY
-        sync: false
-
-      - key: COSMOS_DATABASE_NAME
+      - key: AZURE_COSMOS_DATABASE
         value: asset_copilot_memory
 
-      - key: COSMOS_CONTAINER_NAME
+      - key: AZURE_COSMOS_CONTAINER
         value: agent_state
+
+      # OpenAI
+      - key: OPENAI_API_KEY
+        sync: false
