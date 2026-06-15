@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     azure_cosmos_database: str = "asset_copilot_memory"
     azure_cosmos_container: str = "agent_state"
 
+    # JWT Authentication
+    JWT_SECRET_KEY: str = "dev-secret-change-this-before-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 120
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

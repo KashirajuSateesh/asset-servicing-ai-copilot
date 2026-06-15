@@ -12,6 +12,8 @@ from app.services.azure_sql_service import test_sql_connection
 from app.routers import audit
 from app.routers import system
 from app.routers import analytics
+from app.routers import auth
+from app.routers import users
 
 
 
@@ -63,6 +65,8 @@ app.include_router(memory.router)
 app.include_router(audit.router)
 app.include_router(system.router)
 app.include_router(analytics.router)
+app.include_router(auth.router)
+app.include_router(users.router)
 
 @app.get("/")
 def root():

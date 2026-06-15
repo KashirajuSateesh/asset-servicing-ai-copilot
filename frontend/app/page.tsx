@@ -48,6 +48,8 @@ type CopilotResponse = {
   query: string;
   conversation_id?: string;
   request_id?: string | null;
+  execution_mode?: string;
+  mcp_tool_used?: string;
   route: string;
   record_id?: string | null;
   memory_used?: boolean;
@@ -127,6 +129,72 @@ type AnalyticsSummaryResponse = {
   };
 };
 
+type AuthUser = {
+  user_id: string;
+  name: string;
+  email: string;
+  role: string;
+  roles?: string[];
+  status: string;
+  access_enabled?: boolean;
+};
+
+type AuthResponse = {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+};
+
+type AuthMode = "login" | "signup";
+
+const ROLE_PAGE_ACCESS: Record<string, PageKey[]> = {
+  admin: [
+    "dashboard",
+    "copilot",
+    "documents",
+    "exceptions",
+    "reconciliation",
+    "cases",
+    "admin",
+  ],
+  operations_analyst: [
+    "dashboard",
+    "copilot",
+    "documents",
+    "exceptions",
+  ],
+  reconciliation_analyst: [
+    "dashboard",
+    "copilot",
+    "documents",
+    "reconciliation",
+  ],
+  case_manager: [
+    "dashboard",
+    "copilot",
+    "documents",
+    "cases",
+  ],
+  policy_reviewer: [
+    "dashboard",
+    "copilot",
+    "documents",
+  ],
+  read_only: [
+    "dashboard",
+    "documents",
+  ],
+};
+
+const USER_ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "operations_analyst", label: "Operations Analyst" },
+  { value: "reconciliation_analyst", label: "Reconciliation Analyst" },
+  { value: "case_manager", label: "Case Manager" },
+  { value: "policy_reviewer", label: "Policy Reviewer" },
+  { value: "read_only", label: "Read Only" },
+];
+
 const navigationItems: NavigationItem[] = [
   {
     key: "dashboard",
@@ -168,6 +236,45 @@ const navigationItems: NavigationItem[] = [
 export default function Home() {
   const [activePage, setActivePage] = useState<PageKey>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [authToken, setAuthToken] = useState("");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    const savedToken = sessionStorage.getItem("authToken");
+    const savedUser = sessionStorage.getItem("authUser");
+
+    if (savedToken && savedUser) {
+      setAuthToken(savedToken);
+      setAuthUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    if (!userCanAccessPage(authUser, activePage)) {
+      setActivePage("dashboard");
+    }
+  }, [authUser, activePage]);
+
+  if (!authUser || !authToken) {
+    return (
+      <AuthPage
+        onAuthSuccess={(token, user) => {
+          setAuthToken(token);
+          setAuthUser(user);
+
+          sessionStorage.setItem("authToken", token);
+          sessionStorage.setItem("authUser", JSON.stringify(user));
+
+          sessionStorage.removeItem("dashboardAnalytics");
+          sessionStorage.removeItem("documentsInventory");
+        }}
+      />
+    );
+  }
 
   return (
     <main className="h-screen overflow-hidden bg-slate-100 text-slate-950">
@@ -177,22 +284,216 @@ export default function Home() {
           setActivePage={setActivePage}
           collapsed={sidebarCollapsed}
           setCollapsed={setSidebarCollapsed}
+          authUser={authUser}
         />
 
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-          <Topbar />
+          <Topbar authUser={authUser} onLogout={() => {
+            setAuthToken("");
+            setAuthUser(null);
+
+            sessionStorage.removeItem("authToken");
+            sessionStorage.removeItem("authUser");
+            sessionStorage.removeItem("dashboardAnalytics");
+            sessionStorage.removeItem("documentsInventory");
+          }} />
 
           <section className="flex-1 overflow-y-auto p-5 lg:p-6">
-            {activePage === "dashboard" && <DashboardPage />}
+            {activePage === "dashboard" && (
+              <DashboardPage authToken={authToken} authUser={authUser} />
+            )}
             {activePage === "copilot" && <CopilotPage />}
             {activePage === "documents" && <DocumentsPage />}
             {activePage === "exceptions" && <ExceptionsPage />}
             {activePage === "reconciliation" && <ReconciliationPage />}
             {activePage === "cases" && <CasesPage />}
-            {activePage === "admin" && <AdminPage />}
+            {activePage === "admin" && (
+              <AdminPage authToken={authToken} authUser={authUser} />
+            )}
           </section>
         </div>
       </div>
+    </main>
+  );
+}
+
+function AuthPage({
+  onAuthSuccess,
+}: {
+  onAuthSuccess: (token: string, user: AuthUser) => void;
+}) {
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("admin@demo.com");
+  const [password, setPassword] = useState("admin123");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const apiBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setLoading(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const endpoint = mode === "login" ? "/auth/login" : "/auth/signup";
+
+      const payload =
+        mode === "login"
+          ? { email, password }
+          : { name, email, password };
+
+      const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Authentication failed.");
+      }
+
+      if (mode === "signup") {
+        setMessage(
+          "Signup request submitted. Please wait for admin approval before login."
+        );
+        setMode("login");
+        return;
+      }
+
+      const authResponse = data as AuthResponse;
+      onAuthSuccess(authResponse.access_token, authResponse.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-slate-950">
+      <section className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#061a3a] text-white">
+            <ShieldCheck className="h-7 w-7" />
+          </div>
+
+          <h1 className="text-2xl font-bold">Asset Servicing AI Copilot</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Login or request access to continue.
+          </p>
+        </div>
+
+        <div className="mb-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 text-sm font-bold">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setMessage("");
+              setError("");
+            }}
+            className={`rounded-xl px-4 py-2 ${
+              mode === "login"
+                ? "bg-white text-[#061a3a] shadow-sm"
+                : "text-slate-500"
+            }`}
+          >
+            Login
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode("signup");
+              setMessage("");
+              setError("");
+            }}
+            className={`rounded-xl px-4 py-2 ${
+              mode === "signup"
+                ? "bg-white text-[#061a3a] shadow-sm"
+                : "text-slate-500"
+            }`}
+          >
+            Signup
+          </button>
+        </div>
+
+        {message && (
+          <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            {message}
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "signup" && (
+            <div>
+              <label className="text-sm font-bold text-slate-700">Name</label>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                required
+                placeholder="Enter full name"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm font-bold text-slate-700">Email</label>
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              type="email"
+              placeholder="admin@demo.com"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-bold text-slate-700">Password</label>
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              type="password"
+              placeholder="admin123"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-2xl bg-[#061a3a] px-5 py-3 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+          >
+            {loading
+              ? "Please wait..."
+              : mode === "login"
+                ? "Login"
+                : "Submit Signup Request"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-xs text-slate-400">
+          Signup users remain pending until an admin assigns a role.
+        </p>
+      </section>
     </main>
   );
 }
@@ -202,12 +503,18 @@ function Sidebar({
   setActivePage,
   collapsed,
   setCollapsed,
+  authUser,
 }: {
   activePage: PageKey;
   setActivePage: (page: PageKey) => void;
   collapsed: boolean;
-  setCollapsed: (value: boolean) => void;
+  setCollapsed: (collapsed: boolean) => void;
+  authUser: AuthUser;
 }) {
+  const visibleNavigationItems = navigationItems.filter((item) =>
+    userCanAccessPage(authUser, item.key)
+  );
+
   return (
     <aside
       className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden bg-[#061a3a] text-white transition-all duration-300 ${
@@ -242,7 +549,7 @@ function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {navigationItems.map((item) => {
+        {visibleNavigationItems.map((item) => {
           const isActive = activePage === item.key;
 
           return (
@@ -267,7 +574,7 @@ function Sidebar({
       <div className="shrink-0 border-t border-white/10 p-5 text-xs text-slate-300">
         <div className={`flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
           <RefreshCcw className="h-4 w-4" />
-          {!collapsed && <span>Data refreshed from live services</span>}
+          {!collapsed && <span>Role: {formatRole(authUser.role)}</span>}
         </div>
 
         {!collapsed && (
@@ -280,37 +587,53 @@ function Sidebar({
   );
 }
 
-function Topbar() {
+function Topbar({
+  authUser,
+  onLogout,
+}: {
+  authUser: AuthUser;
+  onLogout: () => void;
+}) {
   return (
-    <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 shadow-sm">
-      <div className="flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <Search className="h-5 w-5 text-slate-400" />
-        <input
-          className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-          placeholder="Search for cases, exceptions, documents, policies..."
-        />
-      </div>
+    <header className="flex h-20 shrink-0 items-center justify-end border-b border-slate-200 bg-white px-8 shadow-sm">
 
       <div className="flex items-center gap-5">
         <div className="hidden items-center gap-2 rounded-full bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 md:flex">
           <ShieldCheck className="h-4 w-4" />
-          Secure Demo
+          JWT Auth Active
+        </div>
+
+        <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 md:block">
+          Role: {formatRole(authUser.role)}
         </div>
 
         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-800">
-          MM
+          {getUserInitials(authUser.name)}
         </div>
 
         <div className="hidden md:block">
-          <p className="text-sm font-semibold">Maria Martinez</p>
-          <p className="text-xs text-slate-500">Operations Manager</p>
+          <p className="text-sm font-semibold">{authUser.name}</p>
+          <p className="text-xs text-slate-500">{authUser.email}</p>
         </div>
+
+        <button
+          onClick={onLogout}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+        >
+          Logout
+        </button>
       </div>
     </header>
   );
 }
 
-function DashboardPage() {
+function DashboardPage({
+  authToken,
+  authUser,
+}: {
+  authToken: string;
+  authUser: AuthUser;
+}) {
   const [analytics, setAnalytics] = useState<AnalyticsSummaryResponse | null>(
     null
   );
@@ -325,7 +648,11 @@ function DashboardPage() {
     setError("");
 
     try {
-      const response = await fetch(`${apiBaseUrl}/analytics/summary`);
+      const response = await fetch(`${apiBaseUrl}/analytics/summary`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Dashboard analytics error: ${response.status}`);
@@ -334,7 +661,6 @@ function DashboardPage() {
       const data = await response.json();
 
       setAnalytics(data);
-      sessionStorage.setItem("dashboardAnalytics", JSON.stringify(data));
       sessionStorage.setItem("dashboardAnalytics", JSON.stringify(data));
     } catch (err) {
       setError(
@@ -762,6 +1088,24 @@ function CopilotPage() {
                   <p className="mt-1 text-sm font-semibold text-blue-950">
                     {lastAskedQuestion}
                   </p>
+                </div>
+              )}
+
+              {result.execution_mode && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
+                    Execution Mode: {result.execution_mode.toUpperCase()}
+                  </span>
+
+                  {result.mcp_tool_used && (
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                      MCP Tool: {result.mcp_tool_used}
+                    </span>
+                  )}
+
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                    Route: {result.route}
+                  </span>
                 </div>
               )}
 
@@ -2045,7 +2389,13 @@ function CasesPage() {
 }
 
 
-function AdminPage() {
+function AdminPage({
+  authToken,
+  authUser,
+}: {
+  authToken: string;
+  authUser: AuthUser;
+}) {
   const [systemHealth, setSystemHealth] =
     useState<SystemHealthResponse | null>(null);
   const [conversationId, setConversationId] = useState("conv_demo_ui_001");
@@ -2054,8 +2404,159 @@ function AdminPage() {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [error, setError] = useState("");
 
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
+  const [editUserRoles, setEditUserRoles] = useState<Record<string, string[]>>({});
+  const [editUserAccess, setEditUserAccess] = useState<Record<string, boolean>>({});
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userSearchText, setUserSearchText] = useState("");
+
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+  async function fetchUsers() {
+    setLoadingUsers(true);
+    setError("");
+
+    try {
+      const [pendingResponse, allUsersResponse] = await Promise.all([
+        fetch(`${apiBaseUrl}/users/pending`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }),
+        fetch(`${apiBaseUrl}/users`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }),
+      ]);
+
+      if (!pendingResponse.ok) {
+        throw new Error(`Pending users error: ${pendingResponse.status}`);
+      }
+
+      if (!allUsersResponse.ok) {
+        throw new Error(`All users error: ${allUsersResponse.status}`);
+      }
+
+      const pendingData = await pendingResponse.json();
+      const allUsersData = await allUsersResponse.json();
+
+      setPendingUsers(pendingData.users || []);
+      setAllUsers(allUsersData.users || []);
+
+      const roleState: Record<string, string[]> = {};
+      const accessState: Record<string, boolean> = {};
+
+      (allUsersData.users || []).forEach((user: any) => {
+        roleState[user.user_id] =
+          user.roles && user.roles.length > 0
+            ? user.roles
+            : user.role && user.role !== "unassigned"
+              ? [user.role]
+              : [];
+
+        accessState[user.user_id] = Boolean(user.access_enabled);
+      });
+
+      setEditUserRoles(roleState);
+      setEditUserAccess(accessState);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch users.");
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  async function approveUser(userId: string) {
+    setLoadingUsers(true);
+    setError("");
+
+    try {
+      const selectedRole = selectedRoles[userId] || "read_only";
+
+      const response = await fetch(`${apiBaseUrl}/users/${userId}/approve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          role: selectedRole,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || `Approve user error: ${response.status}`);
+      }
+
+      await fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve user.");
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  function toggleUserRole(userId: string, role: string) {
+    setEditUserRoles((previous) => {
+      const existingRoles = previous[userId] || [];
+
+      const updatedRoles = existingRoles.includes(role)
+        ? existingRoles.filter((item) => item !== role)
+        : [...existingRoles, role];
+
+      return {
+        ...previous,
+        [userId]: updatedRoles,
+      };
+    });
+  }
+
+  async function updateUserAccess(userId: string) {
+    setLoadingUsers(true);
+    setError("");
+
+    try {
+      const roles = editUserRoles[userId] || [];
+      const accessEnabled = editUserAccess[userId] ?? false;
+
+      if (roles.length === 0 && accessEnabled) {
+        throw new Error("Please select at least one role before enabling access.");
+      }
+
+      const response = await fetch(`${apiBaseUrl}/users/${userId}/access`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          roles,
+          access_enabled: accessEnabled,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || `Update access error: ${response.status}`);
+      }
+
+      await fetchUsers();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update user access."
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
 
   async function fetchSystemHealth() {
     setLoadingHealth(true);
@@ -2105,11 +2606,33 @@ function AdminPage() {
     }
   }
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const filteredUsers = allUsers.filter((user) => {
+    const searchValue = userSearchText.toLowerCase().trim();
+
+    if (!searchValue) {
+      return true;
+    }
+
+    return (
+      user.name?.toLowerCase().includes(searchValue) ||
+      user.email?.toLowerCase().includes(searchValue) ||
+      user.status?.toLowerCase().includes(searchValue) ||
+      user.role?.toLowerCase().includes(searchValue) ||
+      user.roles?.some((role: string) =>
+        role.toLowerCase().includes(searchValue)
+      )
+    );
+  });
+
   return (
     <div className="space-y-8">
       <PageHeader
         title="Admin & Observability"
-        description="Monitor service health, security status, audit logs, request tracing, and operational readiness."
+        description="Manage users, roles, access control, system health, audit logs, and operational readiness."
       />
 
       {error && (
@@ -2117,6 +2640,232 @@ function AdminPage() {
           {error}
         </div>
       )}
+
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-bold">User Access Management</h2>
+            <p className="text-sm text-slate-500">
+              Review signup requests, approve users, assign multiple roles, and enable or disable login access.
+            </p>
+          </div>
+
+          <button
+            onClick={fetchUsers}
+            disabled={loadingUsers}
+            className="rounded-2xl bg-[#061a3a] px-4 py-2 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+          >
+            {loadingUsers ? "Loading..." : "Refresh Users"}
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+          <div className="rounded-2xl border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <h3 className="text-sm font-bold">Pending Signup Requests</h3>
+            </div>
+
+            <div className="max-h-[420px] overflow-auto">
+              {pendingUsers.length === 0 && (
+                <div className="p-6 text-center text-sm text-slate-500">
+                  No pending signup requests.
+                </div>
+              )}
+
+              {pendingUsers.map((user) => (
+                <div
+                  key={user.user_id}
+                  className="border-b border-slate-100 p-4 last:border-b-0"
+                >
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="font-bold text-slate-900">{user.name}</p>
+                      <p className="text-sm text-slate-500">{user.email}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Requested: {user.created_at || "-"}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <select
+                        value={selectedRoles[user.user_id] || "read_only"}
+                        onChange={(event) =>
+                          setSelectedRoles((previous) => ({
+                            ...previous,
+                            [user.user_id]: event.target.value,
+                          }))
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none"
+                      >
+                        {USER_ROLE_OPTIONS.map((roleOption) => (
+                          <option key={roleOption.value} value={roleOption.value}>
+                            {roleOption.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() => approveUser(user.user_id)}
+                        disabled={loadingUsers}
+                        className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 disabled:bg-slate-400"
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <h3 className="text-sm font-bold">All Users & Access Control</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Showing 5 users. Scroll to view more.
+              </p>
+            </div>
+
+            <div className="border-b border-slate-200 bg-white px-4 py-3">
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  value={userSearchText}
+                  onChange={(event) => setUserSearchText(event.target.value)}
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+                  placeholder="Search users by name, email, status, or role..."
+                />
+              </div>
+            </div>
+
+            <div className="max-h-[520px] overflow-auto">
+              {filteredUsers.length === 0 && (
+                <div className="p-6 text-center text-sm text-slate-500">
+                  No users loaded.
+                </div>
+              )}
+
+              {filteredUsers.map((user) => {
+                const isEditing = editingUserId === user.user_id;
+
+                const userRoles =
+                  user.roles && user.roles.length > 0
+                    ? user.roles
+                    : user.role && user.role !== "unassigned"
+                      ? [user.role]
+                      : [];
+
+                return (
+                  <div
+                    key={user.user_id}
+                    className="border-b border-slate-100 p-4 last:border-b-0"
+                  >
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-slate-900">{user.name}</p>
+                          <p className="text-sm text-slate-500">{user.email}</p>
+
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold ${
+                                user.access_enabled
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {user.access_enabled ? "Active" : "Disabled"}
+                            </span>
+
+                            {userRoles.length === 0 && (
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                No role
+                              </span>
+                            )}
+
+                            {userRoles.map((role: string) => (
+                              <span
+                                key={`${user.user_id}-${role}`}
+                                className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700"
+                              >
+                                {formatRole(role)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setEditingUserId(isEditing ? null : user.user_id);
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          {isEditing ? "Cancel" : "Edit"}
+                        </button>
+                      </div>
+
+                      {isEditing && (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="mb-3 text-xs font-bold uppercase text-slate-500">
+                            Edit Roles
+                          </p>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {USER_ROLE_OPTIONS.map((roleOption) => (
+                              <label
+                                key={`${user.user_id}-${roleOption.value}`}
+                                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={(editUserRoles[user.user_id] || []).includes(
+                                    roleOption.value
+                                  )}
+                                  onChange={() =>
+                                    toggleUserRole(user.user_id, roleOption.value)
+                                  }
+                                />
+                                {roleOption.label}
+                              </label>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={editUserAccess[user.user_id] ?? false}
+                                onChange={(event) =>
+                                  setEditUserAccess((previous) => ({
+                                    ...previous,
+                                    [user.user_id]: event.target.checked,
+                                  }))
+                                }
+                              />
+                              Enable login access
+                            </label>
+
+                            <button
+                              onClick={async () => {
+                                await updateUserAccess(user.user_id);
+                                setEditingUserId(null);
+                              }}
+                              disabled={loadingUsers}
+                              className="rounded-xl bg-[#061a3a] px-4 py-2 text-sm font-bold text-white hover:bg-[#0b2855] disabled:bg-slate-400"
+                            >
+                              Update Access
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <section className="rounded-2xl bg-white p-5 shadow-sm">
@@ -2198,6 +2947,16 @@ function AdminPage() {
 
           <div className="mt-6 max-h-[520px] space-y-4 overflow-y-auto pr-2">
             <GovernanceCard
+              title="JWT Login"
+              status="Active"
+              description="Approved users login and receive a signed JWT token."
+            />
+            <GovernanceCard
+              title="Admin RBAC"
+              status="Active"
+              description="Admin can approve users, assign multiple roles, and disable access."
+            />
+            <GovernanceCard
               title="API Key Protection"
               status="Active"
               description="Protected copilot endpoint requires x-copilot-api-key header."
@@ -2213,19 +2972,9 @@ function AdminPage() {
               description="Successful and failed copilot requests are stored in Cosmos DB."
             />
             <GovernanceCard
-              title="Human Review Flag"
-              status="Active"
-              description="Low-confidence or failed workflows can be marked for review."
-            />
-            <GovernanceCard
               title="Cosmos Memory"
               status="Active"
               description="Conversation state is stored for follow-up questions."
-            />
-            <GovernanceCard
-              title="Azure Entra ID / RBAC"
-              status="Future"
-              description="Production upgrade path for role-based enterprise authentication."
             />
           </div>
         </section>
@@ -2629,4 +3378,34 @@ function detectDocumentDomain(documentName: string) {
   }
 
   return "Operations";
+}
+
+function formatRole(role: string) {
+  return role
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function getUserInitials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function userCanAccessPage(userOrRole: AuthUser | string, page: PageKey) {
+  const roles =
+    typeof userOrRole === "string"
+      ? [userOrRole]
+      : userOrRole.roles && userOrRole.roles.length > 0
+        ? userOrRole.roles
+        : [userOrRole.role];
+
+  return roles.some((role) => {
+    const allowedPages = ROLE_PAGE_ACCESS[role] || [];
+    return allowedPages.includes(page);
+  });
 }

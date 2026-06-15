@@ -1,26 +1,17 @@
 import re
 
-from app.services.cosmos_memory_service import (
-    get_latest_agent_state,
-    save_agent_state,
-)
-from app.services.operational_guidance_service import generate_operational_guidance
-from app.services.rag_answer_service import generate_rag_answer
+from app.services.cosmos_memory_service import save_agent_state
 from app.services.audit_log_service import save_audit_event
+from app.services.mcp_client_service import (
+    mcp_operational_guidance,
+    mcp_policy_document_answer,
+    mcp_latest_memory_state,
+)
 
 
 def extract_record_id(query: str) -> str | None:
     """
     Extracts an operational record ID from the user query.
-
-    Why this is useful:
-    Users will usually ask natural questions like:
-    - "What should I do for EXC-000001?"
-    - "Explain trade TRD-0000001"
-    - "Check BRK-0000001"
-
-    The orchestrator needs to detect these IDs and route the query to the
-    operational guidance flow.
     """
 
     patterns = [
@@ -44,17 +35,6 @@ def extract_record_id(query: str) -> str | None:
 def is_follow_up_query(query: str) -> bool:
     """
     Detects whether the user query looks like a follow-up question.
-
-    Why this is useful:
-    If the user asks something like:
-    - "What should I do next?"
-    - "Explain more"
-    - "Is it breached?"
-    - "What is the next action?"
-
-    the query may not include the record ID again.
-    In that case, the orchestrator can use Cosmos DB memory to recover
-    the previous record_id from the same conversation.
     """
 
     query_lower = query.lower().strip()
@@ -80,10 +60,6 @@ def is_follow_up_query(query: str) -> bool:
 def shorten_response_summary(response_summary: str | None) -> str | None:
     """
     Shortens the answer before saving it into Cosmos DB.
-
-    Why this is useful:
-    We do not need to store the full LLM answer as state memory.
-    A short summary is enough for follow-up context and audit trail.
     """
 
     if response_summary and len(response_summary) > 500:
@@ -92,7 +68,78 @@ def shorten_response_summary(response_summary: str | None) -> str | None:
     return response_summary
 
 
-def orchestrate_user_query(
+def extract_latest_state_from_mcp_response(memory_response: dict) -> dict | None:
+    """
+    Safely extracts latest memory state from MCP memory response.
+
+    Different backend endpoints may return memory as:
+    - direct state dict
+    - {"state": {...}}
+    - {"latest_state": {...}}
+    - {"memory_state": {...}}
+
+    This helper makes the orchestrator flexible.
+    """
+
+    if not memory_response:
+        return None
+
+    if memory_response.get("record_id"):
+        return memory_response
+
+    for key in ["state", "latest_state", "memory_state", "agent_state", "data"]:
+        value = memory_response.get(key)
+
+        if isinstance(value, dict):
+            return value
+
+    return None
+
+
+def get_answer_from_response(response: dict) -> str | None:
+    """
+    Extracts answer text from either RAG response or operational guidance response.
+    """
+
+    if not response:
+        return None
+
+    if response.get("answer"):
+        return response.get("answer")
+
+    policy_guidance = response.get("policy_guidance")
+
+    if isinstance(policy_guidance, dict):
+        return policy_guidance.get("answer")
+
+    return None
+
+
+def get_policy_metrics(response: dict) -> dict:
+    """
+    Extracts confidence, label, and human review values from response.
+    """
+
+    if not response:
+        return {}
+
+    policy_guidance = response.get("policy_guidance")
+
+    if isinstance(policy_guidance, dict):
+        return {
+            "confidence_score": policy_guidance.get("confidence_score"),
+            "confidence_label": policy_guidance.get("confidence_label"),
+            "human_review_required": policy_guidance.get("human_review_required"),
+        }
+
+    return {
+        "confidence_score": response.get("confidence_score"),
+        "confidence_label": response.get("confidence_label"),
+        "human_review_required": response.get("human_review_required"),
+    }
+
+
+async def orchestrate_user_query(
     query: str,
     top_k: int = 8,
     conversation_id: str | None = None,
@@ -101,53 +148,41 @@ def orchestrate_user_query(
     """
     Main orchestration service for the copilot.
 
-    What this function does:
-    1. Receives the user's natural language query.
-    2. Checks whether the query contains a record ID.
-    3. If no record ID exists and query is a follow-up, checks Cosmos DB memory.
-    4. If record ID exists or is recovered from memory, routes to operational guidance.
-    5. If no record ID exists, routes to document RAG.
-    6. Saves agent state into Cosmos DB when conversation_id is provided.
-    7. Saves audit event with request_id for traceability.
-    8. Returns a consistent response with route and memory information.
+    This version uses MCP tools instead of directly calling backend services.
 
-    request_id is optional:
-    - It comes from backend middleware.
-    - It helps trace one request across frontend, backend, and Cosmos audit logs.
+    Flow:
+    1. Detect record ID.
+    2. If follow-up, recover latest memory using MCP.
+    3. If record ID exists, call MCP operational_guidance tool.
+    4. If no record ID, call MCP policy_document_answer tool.
+    5. Save memory and audit logs from backend.
     """
 
-    # Step 1: Try to find a record ID directly in the current query.
     record_id = extract_record_id(query)
-
-    # Step 2: Track whether memory was used to recover missing context.
     memory_used = False
 
-    # Step 3: If no record ID is found, check whether this is a follow-up query.
-    # If it is a follow-up and conversation_id is provided, recover the last
-    # record_id from Cosmos DB persistent memory.
+    # Step 1: Follow-up memory recovery through MCP.
     if not record_id and conversation_id and is_follow_up_query(query):
-        latest_state = get_latest_agent_state(conversation_id)
+        memory_response = await mcp_latest_memory_state(conversation_id)
+        latest_state = extract_latest_state_from_mcp_response(memory_response)
 
         if latest_state and latest_state.get("record_id"):
             record_id = latest_state.get("record_id")
             memory_used = True
 
-    # Step 4: If a record ID is found directly or recovered from memory,
-    # route to operational guidance.
+    # Step 2: Operational guidance route through MCP.
     if record_id:
-        guidance_response = generate_operational_guidance(
+        guidance_response = await mcp_operational_guidance(
             record_id=record_id,
             top_k=top_k,
         )
 
-        # Pull memory fields from the operational guidance response.
-        policy_guidance = guidance_response.get("policy_guidance") or {}
+        metrics = get_policy_metrics(guidance_response)
 
         response_summary = shorten_response_summary(
-            policy_guidance.get("answer")
+            get_answer_from_response(guidance_response)
         )
 
-        # Save state to Cosmos DB only when a conversation_id is provided.
         if conversation_id:
             save_agent_state(
                 conversation_id=conversation_id,
@@ -156,12 +191,11 @@ def orchestrate_user_query(
                 response_summary=response_summary,
                 record_id=record_id,
                 business_domain=guidance_response.get("business_domain"),
-                confidence_score=policy_guidance.get("confidence_score"),
-                confidence_label=policy_guidance.get("confidence_label"),
-                human_review_required=policy_guidance.get("human_review_required"),
+                confidence_score=metrics.get("confidence_score"),
+                confidence_label=metrics.get("confidence_label"),
+                human_review_required=metrics.get("human_review_required"),
             )
 
-        # Save audit event for observability and traceability.
         save_audit_event(
             event_type="copilot_request",
             route="operational_guidance",
@@ -169,9 +203,9 @@ def orchestrate_user_query(
             user_query=query,
             record_id=record_id,
             business_domain=guidance_response.get("business_domain"),
-            confidence_score=policy_guidance.get("confidence_score"),
-            confidence_label=policy_guidance.get("confidence_label"),
-            human_review_required=policy_guidance.get("human_review_required"),
+            confidence_score=metrics.get("confidence_score"),
+            confidence_label=metrics.get("confidence_label"),
+            human_review_required=metrics.get("human_review_required"),
             memory_used=memory_used,
             memory_saved=conversation_id is not None,
             status="success",
@@ -182,6 +216,8 @@ def orchestrate_user_query(
             "query": query,
             "conversation_id": conversation_id,
             "request_id": request_id,
+            "execution_mode": "mcp",
+            "mcp_tool_used": "operational_guidance",
             "route": "operational_guidance",
             "record_id": record_id,
             "memory_used": memory_used,
@@ -189,18 +225,18 @@ def orchestrate_user_query(
             "response": guidance_response,
         }
 
-    # Step 5: If no record ID is found and no memory was used, use normal
-    # document RAG flow.
-    rag_response = generate_rag_answer(
+    # Step 3: Document RAG route through MCP.
+    rag_response = await mcp_policy_document_answer(
         query=query,
         top_k=top_k,
     )
 
+    metrics = get_policy_metrics(rag_response)
+
     response_summary = shorten_response_summary(
-        rag_response.get("answer")
+        get_answer_from_response(rag_response)
     )
 
-    # Save document RAG state to Cosmos DB only when conversation_id is provided.
     if conversation_id:
         save_agent_state(
             conversation_id=conversation_id,
@@ -209,12 +245,11 @@ def orchestrate_user_query(
             response_summary=response_summary,
             record_id=None,
             business_domain=rag_response.get("business_domain"),
-            confidence_score=rag_response.get("confidence_score"),
-            confidence_label=rag_response.get("confidence_label"),
-            human_review_required=rag_response.get("human_review_required"),
+            confidence_score=metrics.get("confidence_score"),
+            confidence_label=metrics.get("confidence_label"),
+            human_review_required=metrics.get("human_review_required"),
         )
 
-    # Save audit event for observability and traceability.
     save_audit_event(
         event_type="copilot_request",
         route="document_rag",
@@ -222,9 +257,9 @@ def orchestrate_user_query(
         user_query=query,
         record_id=None,
         business_domain=rag_response.get("business_domain"),
-        confidence_score=rag_response.get("confidence_score"),
-        confidence_label=rag_response.get("confidence_label"),
-        human_review_required=rag_response.get("human_review_required"),
+        confidence_score=metrics.get("confidence_score"),
+        confidence_label=metrics.get("confidence_label"),
+        human_review_required=metrics.get("human_review_required"),
         memory_used=memory_used,
         memory_saved=conversation_id is not None,
         status="success",
@@ -235,6 +270,8 @@ def orchestrate_user_query(
         "query": query,
         "conversation_id": conversation_id,
         "request_id": request_id,
+        "execution_mode": "mcp",
+        "mcp_tool_used": "policy_document_answer",
         "route": "document_rag",
         "record_id": None,
         "memory_used": memory_used,

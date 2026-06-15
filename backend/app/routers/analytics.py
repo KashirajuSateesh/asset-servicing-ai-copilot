@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.security.rbac import get_current_role, require_permission
 from app.services.analytics_service import get_analytics_summary
 
 
@@ -10,15 +11,15 @@ router = APIRouter(
 
 
 @router.get("/summary")
-def analytics_summary():
+def analytics_summary(role: str = Depends(get_current_role)):
     """
-    Returns analytics data for the frontend Analytics page.
+    Returns analytics data for Dashboard.
 
-    This endpoint combines:
-    - operational counts from Azure SQL
-    - copilot usage metrics from Cosmos audit logs
-    - retrieval/indexing summary
+    RBAC:
+    User must have analytics permission.
     """
+
+    require_permission("analytics", role)
 
     try:
         return get_analytics_summary()
