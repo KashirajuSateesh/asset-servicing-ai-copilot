@@ -1,31 +1,24 @@
 services:
   - type: web
     name: asset-servicing-ai-copilot-backend
-    env: python
+    env: docker
     rootDir: backend
+    dockerfilePath: ./Dockerfile
     plan: free
 
-    buildCommand: "pip install uv && uv sync --locked"
-    startCommand: "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
-
     envVars:
-      # App
       - key: APP_NAME
         value: Asset Servicing AI Copilot API
 
       - key: APP_ENV
         value: production
 
-      # Backend URL used by MCP tools.
-      # After Render creates the service, update this if Render gives a different URL.
       - key: BACKEND_API_BASE_URL
         value: https://asset-servicing-ai-copilot-backend.onrender.com
 
-      # Copilot API key
       - key: COPILOT_API_KEY
         sync: false
 
-      # JWT authentication
       - key: JWT_SECRET_KEY
         sync: false
 
@@ -35,7 +28,6 @@ services:
       - key: JWT_EXPIRE_MINUTES
         value: "120"
 
-      # Azure SQL
       - key: AZURE_SQL_SERVER
         sync: false
 
@@ -51,14 +43,12 @@ services:
       - key: AZURE_SQL_DRIVER
         value: ODBC Driver 18 for SQL Server
 
-      # Azure Blob Storage
       - key: AZURE_STORAGE_ACCOUNT_NAME
         sync: false
 
       - key: AZURE_STORAGE_CONNECTION_STRING
         sync: false
 
-      # Azure AI Search
       - key: AZURE_SEARCH_ENDPOINT
         sync: false
 
@@ -68,7 +58,6 @@ services:
       - key: AZURE_SEARCH_INDEX_NAME
         value: asset-policy-chunks
 
-      # Azure Cosmos DB
       - key: AZURE_COSMOS_ENDPOINT
         sync: false
 
@@ -81,6 +70,5 @@ services:
       - key: AZURE_COSMOS_CONTAINER
         value: agent_state
 
-      # OpenAI
       - key: OPENAI_API_KEY
         sync: false
