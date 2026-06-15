@@ -439,7 +439,7 @@ function AuthPage({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           {mode === "signup" && (
             <div>
               <label className="text-sm font-bold text-slate-700">Name</label>
@@ -460,6 +460,8 @@ function AuthPage({
               onChange={(event) => setEmail(event.target.value)}
               required
               type="email"
+              autoComplete="off"
+              name="user_email_field"
               placeholder="Enter your email"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
@@ -472,6 +474,8 @@ function AuthPage({
               onChange={(event) => setPassword(event.target.value)}
               required
               type="password"
+              autoComplete="new-password"
+              name="user_password_field"
               placeholder="Enter your password"
               className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
             />
